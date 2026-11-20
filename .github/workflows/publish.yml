@@ -35,6 +35,11 @@ on:
         required: false
         type: string
         default: '.'
+      flutter-version:
+        description: 'Flutter SDK version for flutter-tagged packages (stable channel).'
+        required: false
+        type: string
+        default: '3.50.0'
 
 jobs:
   publish:
@@ -65,7 +70,7 @@ jobs:
         if: steps.runner.outputs.runner == 'flutter'
         with:
           channel: stable
-          flutter-version: '3.50.0'
+          flutter-version: ${{ inputs.flutter-version }}
           cache: true
 
       - name: Workspace dependencies
