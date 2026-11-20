@@ -102,9 +102,19 @@ enum DependencyKind { hosted, hostedUrl, sdk, path, git }
 /// [ChangesetsConfig.packagesDir], its classification, and its internal
 /// references.
 final class WorkspaceGraph {
-  WorkspaceGraph._(this.packages);
+  WorkspaceGraph._(this.packages, {required this.usesWorkspaceResolution});
 
   final Map<String, WorkspacePackage> packages;
+
+  /// Whether discovery came from the root pubspec's `workspace:` declaration
+  /// (Dart 3.x workspaces resolve as one unit) rather than the one-level
+  /// packages_dir fallback.
+  final bool usesWorkspaceResolution;
+
+  /// Whether any workspace member runs on Flutter. In workspace mode a
+  /// single `sdk: flutter` member forces the whole shared resolution to
+  /// need the Flutter SDK — even when publishing a dart-only member.
+  bool get anyFlutterMember => packages.values.any((pkg) => pkg.isFlutter);
 
   static Future<WorkspaceGraph> load(
     String repoRoot,
@@ -182,7 +192,10 @@ final class WorkspaceGraph {
     if (config.rootPackage && rootPubspec.existsSync()) {
       addPackage(rootPubspec);
     }
-    return WorkspaceGraph._(Map.unmodifiable(found));
+    return WorkspaceGraph._(
+      Map.unmodifiable(found),
+      usesWorkspaceResolution: discovered,
+    );
   }
 
   /// Expands the root pubspec's `workspace:` member patterns relative to

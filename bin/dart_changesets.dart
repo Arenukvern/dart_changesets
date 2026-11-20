@@ -337,7 +337,9 @@ int runTags(String changesetsDir) {
 // ---------------------------------------------------------------------------
 
 /// Prints `flutter` or `dart` — the publish runner for the tagged package.
-/// CI uses this to decide which SDK to install before invoking publish-tag.
+/// Workspace-aware (see `publishRunner`): in workspace mode a single Flutter
+/// member requires the SDK for every tag. CI uses this to decide which SDK
+/// to install before invoking publish-tag.
 Future<int> runRunner(ArgResults args) async {
   final cwd = args['cwd'] as String? ?? '.';
   var dir = Directory(cwd.isEmpty ? '.' : cwd).absolute;
@@ -372,7 +374,7 @@ Future<int> runRunner(ArgResults args) async {
     stderr.writeln('dart_changesets: "${parsed.$1}" is not a workspace package.');
     return publishExitUsage;
   }
-  print(pkg.isFlutter ? 'flutter' : 'dart');
+  print(publishRunner(graph, pkg));
   return 0;
 }
 

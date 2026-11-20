@@ -34,7 +34,9 @@ jobs:
     with:
       tag: ${{ inputs.tag || github.ref_name }}
       execute: ${{ github.event_name == 'push' || inputs.execute }}
-      # Flutter SDK version used for flutter-tagged packages (default 3.50.0):
+      # Flutter SDK version (default: latest stable — maintenance-free; the
+      # SDK is installed only when the workspace actually needs it).
+      # Pin an exact version only when your workspace's resolution needs it:
       # flutter-version: '3.47.5'
       # Optional: pin the engine ref (defaults to the action's own ref).
       # engine-ref: v1

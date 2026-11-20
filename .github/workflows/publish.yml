@@ -36,10 +36,14 @@ on:
         type: string
         default: '.'
       flutter-version:
-        description: 'Flutter SDK version for flutter-tagged packages (stable channel).'
+        description: >
+          Flutter SDK version for flutter-needing runs (stable channel).
+          Empty = the latest stable release, which keeps release trains
+          maintenance-free across Flutter cadence. Pin an exact version
+          only when your workspace's resolution requires it.
         required: false
         type: string
-        default: '3.50.0'
+        default: ''
 
 jobs:
   publish:
@@ -66,16 +70,19 @@ jobs:
           runner="$(dart_changesets runner --tag "${{ inputs.tag }}")"
           echo "runner=$runner" >> "$GITHUB_OUTPUT"
 
+      # The Flutter SDK is installed ONLY when the workspace needs it:
+      # `pub publish` inside a pub-workspace member resolves the whole
+      # workspace, so any `sdk: flutter` member requires the SDK even for
+      # a dart-only tag. Pure-Dart repositories (and dart-only fallback
+      # discovery) never pay for it. The SDK cache (tool cache, keyed on
+      # channel/version/arch) makes every run after the first per version
+      # a fast restore.
       - uses: subosito/flutter-action@v2
         if: steps.runner.outputs.runner == 'flutter'
         with:
           channel: stable
           flutter-version: ${{ inputs.flutter-version }}
           cache: true
-
-      - name: Workspace dependencies
-        run: dart pub get
-        working-directory: ${{ inputs.cwd }}
 
       - name: Publish this tag's package
         working-directory: ${{ inputs.cwd }}

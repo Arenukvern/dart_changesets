@@ -64,7 +64,11 @@ reviewed files, not commit messages.
   committed by the PR lists one tag per release → the action pushes each tag
   and dispatches the consumer's `publish.yml` once per tag.
 - **Publish workflow**: installs the engine via `dart pub global activate`,
-  asks it whether the tagged package needs Flutter, installs the SDK, then
+  decides workspace-aware whether the run needs Flutter (`pub publish`
+  inside a pub-workspace member resolves the whole workspace, so any
+  `sdk: flutter` member makes the SDK required — pure-Dart repositories
+  never install it), installs the SDK from the stable channel (latest by
+  default; cache enabled) when needed, then
   runs static checks → skip-existing → typed BOOTSTRAP gate for never-published
   packages → dependency wait → strict dry-run → `pub publish --force` (OIDC)
   → wait for pub.dev visibility.

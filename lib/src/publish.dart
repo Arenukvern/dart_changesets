@@ -163,7 +163,7 @@ FAIL: pub.dev does not yet expose versions of ${pending.keys.toList()}
   }
 
   // -- Strict dry-run -----------------------------------------------------
-  final runner = pkg.isFlutter ? 'flutter' : 'dart';
+  final runner = publishRunner(graph, pkg);
   final dryRun = await Process.run(
     runner,
     const <String>['pub', 'publish', '--dry-run'],
@@ -211,6 +211,19 @@ FAIL: pub.dev does not yet expose versions of ${pending.keys.toList()}
     'package page manually before re-running.',
   );
   return publishExitWaitTimeout;
+}
+
+/// The executable `pub publish` must run under: `flutter` or `dart`.
+///
+/// Workspace-aware by experiment (2026-11-21): `pub publish` inside a
+/// workspace member resolves the WHOLE workspace, so in workspace mode a
+/// single `sdk: flutter` member makes the SDK required even for a
+/// dart-only tag. The packages_dir fallback resolves the package alone.
+String publishRunner(WorkspaceGraph graph, WorkspacePackage pkg) {
+  if (graph.usesWorkspaceResolution && graph.anyFlutterMember) {
+    return 'flutter';
+  }
+  return pkg.isFlutter ? 'flutter' : 'dart';
 }
 
 Future<bool> _hasVersion(

@@ -159,4 +159,72 @@ void main() {
       teardownRepo(root);
     }
   });
+
+  group('publishRunner (workspace-aware SDK requirement)', () {
+    // Workspace-mode repo (root pubspec with `workspace:`); optionally with
+    // a flutter sibling that forces the shared whole-workspace resolution.
+    Directory buildRunnerFixture({required bool flutterSibling}) {
+      final root = Directory.systemTemp.createTempSync('dc_runner_');
+      void pkg(String rel, String content) {
+        final dir = Directory('${root.path}/$rel')..createSync(recursive: true);
+        File('${dir.path}/pubspec.yaml').writeAsStringSync(content);
+      }
+
+      pkg('pkgs/a_dart', 'name: a_dart\nversion: 1.0.0\n');
+      if (flutterSibling) {
+        pkg(
+          'pkgs/b_flutter',
+          'name: b_flutter\nversion: 1.0.0\ndependencies:\n'
+          '  flutter:\n    sdk: flutter\n',
+        );
+      }
+      File('${root.path}/pubspec.yaml').writeAsStringSync(
+        'name: runner_root\npublish_to: none\nworkspace:\n  - pkgs/*\n',
+      );
+      return root;
+    }
+
+    test('mixed workspace: a dart-only tag still needs the Flutter SDK '
+        '(pub publish resolves the whole workspace)', () async {
+      final root = buildRunnerFixture(flutterSibling: true);
+      try {
+        final graph = await loadGraph(root.path);
+        expect(graph.usesWorkspaceResolution, isTrue);
+        expect(publishRunner(graph, graph.packages['a_dart']!), 'flutter');
+        expect(publishRunner(graph, graph.packages['b_flutter']!), 'flutter');
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('pure-dart workspace: dart tags stay on dart', () async {
+      final root = buildRunnerFixture(flutterSibling: false);
+      try {
+        final graph = await loadGraph(root.path);
+        expect(graph.usesWorkspaceResolution, isTrue);
+        expect(publishRunner(graph, graph.packages['a_dart']!), 'dart');
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('packages_dir fallback: per-package detection (no shared '
+        'resolution)', () async {
+      final root = buildFixtureRepo(const {
+        'a_dart': FixturePackage(version: '1.0.0'),
+        'b_flutter': FixturePackage(
+          version: '1.0.0',
+          dependencies: {'flutter': '{sdk: flutter}'},
+        ),
+      });
+      try {
+        final graph = await loadGraph(root.path);
+        expect(graph.usesWorkspaceResolution, isFalse);
+        expect(publishRunner(graph, graph.packages['a_dart']!), 'dart');
+        expect(publishRunner(graph, graph.packages['b_flutter']!), 'flutter');
+      } finally {
+        teardownRepo(root);
+      }
+    });
+  });
 }
