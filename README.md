@@ -5,6 +5,7 @@ that turns small intent files into version PRs and per-tag pub.dev publish
 trains.
 
 [![CI](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml/badge.svg)](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml)
+[![pub: dart_changesets](https://img.shields.io/pub/v/dart_changesets.svg)](https://pub.dev/packages/dart_changesets)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-dart__changesets-blue?logo=github)](https://github.com/marketplace/actions/dart_changesets)
 [![Dart SDK](https://img.shields.io/badge/Dart-%5E3.14.0-blue?logo=dart)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -84,8 +85,16 @@ released; the doctor gate fails when a publishable package depends on one.
 
 ## CLI
 
+One-off, no install — Dart 3.12+ runs any pub.dev executable directly:
+
 ```bash
-dart pub global activate git:https://github.com/Arenukvern/dart_changesets
+dart run dart_changesets@ status   # pending intents → planned releases
+```
+
+Or install globally:
+
+```bash
+dart pub global activate dart_changesets
 dart_changesets add                # interactive intent file
 dart_changesets status             # pending intents → planned releases
 dart_changesets version [--check]  # apply (or detect) the version train
