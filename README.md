@@ -5,7 +5,7 @@ that turns small intent files into version PRs and per-tag pub.dev publish
 trains.
 
 [![CI](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml/badge.svg)](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml)
-[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-dart__changesets-blue?logo=github)](https://github.com/marketplace/actions/dart-changesets)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-dart__changesets-blue?logo=github)](https://github.com/marketplace/actions/dart_changesets)
 [![Dart SDK](https://img.shields.io/badge/Dart-%5E3.14.0-blue?logo=dart)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -24,7 +24,7 @@ skip-existing self-healing; see
 ## Quick start (consumer repository)
 
 The action is published on the
-[GitHub Marketplace](https://github.com/marketplace/actions/dart-changesets) —
+[GitHub Marketplace](https://github.com/marketplace/actions/dart_changesets) —
 pin `@v1` for the current major.
 
 1. **Two workflow files** (copy from [example/consumer-workflows](example/consumer-workflows)):

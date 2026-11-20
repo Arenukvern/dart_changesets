@@ -71,7 +71,7 @@ merge the `chore: version packages` PR — tags and the pub.dev publish
 dispatch follow automatically. The floating major tag `v1` moves to each
 released commit so consumers pinning `@v1` receive the release, and a
 matching semver release (`v1.x.y`) is published to the
-[GitHub Marketplace](https://github.com/marketplace/actions/dart-changesets)
+[GitHub Marketplace](https://github.com/marketplace/actions/dart_changesets)
 on the same tag.
 
 ## Code of conduct
