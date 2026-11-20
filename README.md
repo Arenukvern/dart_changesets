@@ -4,6 +4,11 @@ A changesets-style release engine for Dart — **GitHub Action + Dart CLI** —
 that turns small intent files into version PRs and per-tag pub.dev publish
 trains.
 
+[![CI](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml/badge.svg)](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-dart__changesets-blue?logo=github)](https://github.com/marketplace/actions/dart-changesets)
+[![Dart SDK](https://img.shields.io/badge/Dart-%5E3.14.0-blue?logo=dart)](https://dart.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 ## Attribution
 
 Design inspired by [changesets](https://github.com/changesets/changesets) and
@@ -17,6 +22,10 @@ skip-existing self-healing; see
 [dart.dev automated publishing](https://dart.dev/tools/pub/automated-publishing)).
 
 ## Quick start (consumer repository)
+
+The action is published on the
+[GitHub Marketplace](https://github.com/marketplace/actions/dart-changesets) —
+pin `@v1` for the current major.
 
 1. **Two workflow files** (copy from [example/consumer-workflows](example/consumer-workflows)):
    `release.yml` (push to main) and `publish.yml` (per-tag pub.dev publish).
@@ -104,3 +113,12 @@ across days.
 The action and the reusable publish workflow run this repo's own train
 (`.github/workflows/release.yml` + `self_publish.yml`). The engine package
 lives at the repository root; write an intent file to release it.
+
+## Contributing & community
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — setup, validation, conventions, PR checklist
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [SECURITY.md](SECURITY.md) — private vulnerability reporting
+- [Discussions](https://github.com/Arenukvern/dart_changesets/discussions) — usage questions
+
+Released under the [MIT License](LICENSE).

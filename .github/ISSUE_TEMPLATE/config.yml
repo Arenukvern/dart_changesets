@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & usage help
+    url: https://github.com/Arenukvern/dart_changesets/discussions
+    about: Usage questions about wiring the action or the CLI in your repository.

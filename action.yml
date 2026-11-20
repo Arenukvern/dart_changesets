@@ -30,8 +30,8 @@
 # Plus a publish workflow (see example/consumer-workflows/publish.yml).
 name: dart_changesets
 description: >-
-  Changesets-style release engine for Dart: intent files → version PR →
-  per-tag pub.dev publish dispatch.
+  Changesets-style release engine for Dart & Flutter: intent files →
+  version PR → per-tag pub.dev publish dispatch.
 branding:
   icon: tag
   color: blue
