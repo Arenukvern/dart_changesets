@@ -79,6 +79,125 @@ void main() {
     });
   });
 
+  group('workspace discovery', () {
+    // Builds a repo whose packages live in the shapes the Dart `workspace:`
+    // declaration can express: one-level globs, nested globs, and plain
+    // root-level members — beyond what a one-level packages_dir scan reaches.
+    Directory buildWorkspaceFixture() {
+      final root = Directory.systemTemp.createTempSync('dcg_workspace_');
+      void pkg(String rel, String name, String version, {bool private = false}) {
+        final dir = Directory('${root.path}/$rel')..createSync(recursive: true);
+        File('${dir.path}/pubspec.yaml').writeAsStringSync(
+          'name: $name\nversion: $version\n'
+          '${private ? 'publish_to: none\n' : ''}',
+        );
+      }
+
+      pkg('packages/alpha', 'alpha', '1.0.0');
+      pkg('packages/beta', 'beta', '0.9.0', private: true);
+      pkg('plugins/ecsly_replay', 'ecsly_replay', '0.2.0');
+      pkg('plugins/ecs_camera/ecs_camera_core', 'ecs_camera_core', '0.1.0');
+      pkg('tool/cli', 'tool_cli', '0.3.0', private: true);
+      pkg('root_member', 'root_member', '1.4.0');
+      Directory('${root.path}/packages/empty').createSync(recursive: true);
+      Directory('${root.path}/packages/.hidden').createSync(recursive: true);
+      File('${root.path}/packages/.hidden/pubspec.yaml')
+          .writeAsStringSync('name: hidden\nversion: 0.0.1\n');
+      File('${root.path}/pubspec.yaml').writeAsStringSync('''
+name: workspace_root
+publish_to: none
+environment:
+  sdk: ^3.14.0
+workspace:
+  - packages/*
+  - plugins/*
+  - plugins/*/*
+  - tool/cli
+  - root_member
+  - gone/missing
+''');
+      return root;
+    }
+
+    test('expands workspace globs: nested, plain members, hidden skipped',
+        () async {
+      final root = buildWorkspaceFixture();
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(),
+        );
+        expect(
+          graph.packages.keys.toSet(),
+          {
+            'alpha',
+            'beta',
+            'ecsly_replay',
+            'ecs_camera_core',
+            'tool_cli',
+            'root_member',
+          },
+        );
+        expect(graph.packages['alpha']!.publishable, isTrue);
+        expect(graph.packages['beta']!.publishable, isFalse);
+        expect(graph.packages['root_member']!.publishable, isTrue);
+        expect(graph.packages.containsKey('hidden'), isFalse);
+        expect(graph.packages.containsKey('workspace_root'), isFalse);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('workspace members cascade as dependents via hosted constraints',
+        () async {
+      final root = buildWorkspaceFixture();
+      try {
+        // alpha depends on the nested member; the graph must see the edge
+        // even though ecs_camera_core sits two levels deep.
+        final alphaPubspec =
+            File('${root.path}/packages/alpha/pubspec.yaml');
+        alphaPubspec.writeAsStringSync(
+          '${alphaPubspec.readAsStringSync()}dependencies:\n'
+          '  ecs_camera_core: ^0.1.0\n',
+        );
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(),
+        );
+        expect(graph.reverseDependents('ecs_camera_core').map((p) => p.name),
+            ['alpha']);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('falls back to packages_dir scan when no workspace declaration',
+        () async {
+      final root = buildFixtureRepo(const {
+        'a': FixturePackage(version: '1.0.0'),
+      });
+      try {
+        final graph = await loadGraph(root.path);
+        expect(graph.packages.keys.toSet(), {'a'});
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('missing packages_dir still throws outside root_package mode',
+        () async {
+      final root = Directory.systemTemp.createTempSync('dcg_nothrow_');
+      try {
+        expect(
+          () => WorkspaceGraph.load(root.path, const ChangesetsConfig()),
+          throwsA(isA<StateError>()),
+        );
+      } finally {
+        teardownRepo(root);
+      }
+    });
+  });
+
   group('pubspec text rewrites', () {
     test('rewriteVersion preserves comments and formatting', () {
       const content = 'name: x\nversion: 1.2.3 # pinned\nenvironment:\n  sdk: ^3.14.0\n';

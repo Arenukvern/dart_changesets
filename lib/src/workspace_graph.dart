@@ -111,13 +111,6 @@ final class WorkspaceGraph {
     ChangesetsConfig config,
   ) async {
     final dir = Directory(p.join(repoRoot, config.packagesDir));
-    if (!dir.existsSync() && !config.rootPackage) {
-      throw StateError(
-        'packages directory not found: ${dir.path} '
-        '(configure packages_dir in changesets.yaml, or set root_package: '
-        'true for single-package repositories)',
-      );
-    }
     final found = <String, WorkspacePackage>{};
 
     void addPackage(File pubspecFile) {
@@ -146,21 +139,108 @@ final class WorkspaceGraph {
       found[pkg.name] = pkg;
     }
 
-    if (dir.existsSync()) {
-      for (final entry in dir.listSync()) {
-        if (entry is! Directory) continue;
-        final pubspecFile = File(p.join(entry.path, 'pubspec.yaml'));
-        if (!pubspecFile.existsSync()) continue;
-        addPackage(pubspecFile);
+    // Discovery order: the root pubspec's `workspace:` declaration is the
+    // resolution truth for Dart 3.x workspaces (it covers multiple roots,
+    // nested globs like plugins/*/*, and root-level members that a one-level
+    // packages_dir scan cannot reach). The one-level packages_dir scan is
+    // the fallback for repositories without a workspace declaration.
+    var discovered = false;
+    final rootPubspec = File(p.join(repoRoot, 'pubspec.yaml'));
+    if (rootPubspec.existsSync()) {
+      final rootDoc = loadYamlNode(rootPubspec.readAsStringSync());
+      final workspace = rootDoc is YamlMap ? rootDoc['workspace'] : null;
+      if (workspace is YamlList && workspace.isNotEmpty) {
+        for (final memberDir in _expandWorkspaceMembers(
+          repoRoot,
+          workspace,
+        )) {
+          final pubspecFile = File(p.join(memberDir.path, 'pubspec.yaml'));
+          if (pubspecFile.existsSync()) {
+            addPackage(pubspecFile);
+          }
+        }
+        discovered = true;
       }
     }
-    if (config.rootPackage) {
-      final rootPubspec = File(p.join(repoRoot, 'pubspec.yaml'));
-      if (rootPubspec.existsSync()) {
-        addPackage(rootPubspec);
+    if (!discovered) {
+      if (!dir.existsSync() && !config.rootPackage) {
+        throw StateError(
+          'packages directory not found: ${dir.path} '
+          '(configure packages_dir in changesets.yaml, or set root_package: '
+          'true for single-package repositories)',
+        );
       }
+      if (dir.existsSync()) {
+        for (final entry in dir.listSync()) {
+          if (entry is! Directory) continue;
+          final pubspecFile = File(p.join(entry.path, 'pubspec.yaml'));
+          if (!pubspecFile.existsSync()) continue;
+          addPackage(pubspecFile);
+        }
+      }
+    }
+    if (config.rootPackage && rootPubspec.existsSync()) {
+      addPackage(rootPubspec);
     }
     return WorkspaceGraph._(Map.unmodifiable(found));
+  }
+
+  /// Expands the root pubspec's `workspace:` member patterns relative to
+  /// [repoRoot]. Supported shapes: plain paths (`mcp_server_dart`) and
+  /// single-segment globs at any depth (`packages/*`, `plugins/*/*`).
+  /// Hidden directories and directories that no longer exist are skipped;
+  /// duplicates collapse.
+  static List<Directory> _expandWorkspaceMembers(
+    String repoRoot,
+    YamlList members,
+  ) {
+    final byPath = <String, Directory>{};
+    void collect(Directory dir) {
+      byPath[dir.path] = dir;
+    }
+
+    for (final raw in members) {
+      final pattern = raw.toString().trim();
+      if (pattern.isEmpty) continue;
+      var current = <Directory>[Directory(repoRoot)];
+      for (final segment in pattern.split('/')) {
+        if (segment.isEmpty || segment == '.') continue;
+        final next = <Directory>[];
+        for (final dir in current) {
+          if (!dir.existsSync()) continue;
+          if (segment == '*') {
+            for (final entry in dir.listSync()) {
+              if (entry is! Directory) continue;
+              if (p.basename(entry.path).startsWith('.')) continue;
+              next.add(entry);
+            }
+          } else if (segment.contains('*')) {
+            // Segment with an embedded glob (e.g. `ecsly_*`): match by
+            // prefix/suffix around the star.
+            final star = segment.indexOf('*');
+            final prefix = segment.substring(0, star);
+            final suffix = segment.substring(star + 1);
+            for (final entry in dir.listSync()) {
+              if (entry is! Directory) continue;
+              final base = p.basename(entry.path);
+              if (base.startsWith('.')) continue;
+              if (base.length < prefix.length + suffix.length) continue;
+              if (!base.startsWith(prefix)) continue;
+              if (!base.endsWith(suffix)) continue;
+              next.add(entry);
+            }
+          } else {
+            final candidate = Directory(p.join(dir.path, segment));
+            if (candidate.existsSync()) next.add(candidate);
+          }
+        }
+        current = next;
+      }
+      for (final dir in current) {
+        collect(dir);
+      }
+    }
+    return byPath.values.toList();
   }
 
   /// Packages that reference [name] (regular or dev dependencies).
