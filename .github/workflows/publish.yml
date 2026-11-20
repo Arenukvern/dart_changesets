@@ -1,0 +1,81 @@
+# Reusable per-tag pub.dev publish workflow.
+#
+# Consumers call this from their own trigger workflow (workflow_call), which
+# keeps pub.dev's per-tag ref gating happy: each run publishes exactly the
+# package its tag names. Requires id-token: write (pub.dev OIDC automated
+# publishing; no stored secrets).
+#
+# Consumer template (see example/consumer-workflows/publish.yml):
+#   jobs:
+#     publish:
+#       uses: Arenukvern/dart_changesets/.github/workflows/publish.yml@v1
+#       with: { tag: <tag>, execute: true }
+#       permissions: { contents: read, id-token: write }
+name: dart_changesets publish (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. my_package-v1.2.3'
+        required: true
+        type: string
+      execute:
+        description: 'Publish for real (false = preflight only)'
+        required: false
+        type: boolean
+        default: true
+      engine-ref:
+        description: 'Engine ref to install (defaults to this repo default branch)'
+        required: false
+        type: string
+        default: ''
+      cwd:
+        description: 'Consumer repository working directory'
+        required: false
+        type: string
+        default: '.'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Checks out the CALLER repository when invoked via workflow_call.
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Install engine
+        run: |
+          ref="${{ inputs.engine-ref }}"
+          if [ -z "$ref" ]; then ref="${GITHUB_ACTION_REF:-main}"; fi
+          dart pub global activate --source git \
+            "https://github.com/${GITHUB_ACTION_REPOSITORY:-Arenukvern/dart_changesets}.git" \
+            --git-ref "$ref"
+
+      - name: Detect package runner (engine knows the layout)
+        id: runner
+        working-directory: ${{ inputs.cwd }}
+        run: |
+          runner="$(dart_changesets runner --tag "${{ inputs.tag }}")"
+          echo "runner=$runner" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
+        if: steps.runner.outputs.runner == 'flutter'
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+
+      - name: Workspace dependencies
+        run: dart pub get
+        working-directory: ${{ inputs.cwd }}
+
+      - name: Publish this tag's package
+        working-directory: ${{ inputs.cwd }}
+        run: |
+          execute_flag=""
+          if [ "${{ inputs.execute }}" = "true" ]; then execute_flag="--execute"; fi
+          dart_changesets publish-tag \
+            --tag "${{ inputs.tag }}" $execute_flag --skip-existing

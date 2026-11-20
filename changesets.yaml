@@ -1,0 +1,6 @@
+# dart_changesets self-release configuration.
+# Single-package repository: the released package IS the repository root.
+packages_dir: pkgs
+root_package: true
+dependent_bump: patch
+tag_format: '{package}-v{version}'

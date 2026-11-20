@@ -1,0 +1,38 @@
+# Consumer template: .github/workflows/publish.yml
+# The per-tag publish leg. pub.dev's automated publishing is ref-gated, so
+# each run publishes exactly the package its tag names; the dart_changesets
+# action dispatches one run per tag when the version PR merges.
+name: dart_changesets publish
+
+on:
+  push:
+    tags:
+      - '*-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. my_package-v1.2.3'
+        required: true
+        type: string
+      execute:
+        description: 'Publish for real (unchecked = preflight)'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dart-changesets-publish-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    uses: Arenukvern/dart_changesets/.github/workflows/publish.yml@v1
+    with:
+      tag: ${{ inputs.tag || github.ref_name }}
+      execute: ${{ github.event_name == 'push' || inputs.execute }}
+      # Optional: pin the engine ref (defaults to the action's own ref).
+      # engine-ref: v1

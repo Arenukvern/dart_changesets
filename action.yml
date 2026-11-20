@@ -1,0 +1,193 @@
+# dart_changesets — GitHub Action (composite).
+#
+# Modeled after @changesets/action: ONE step in ONE workflow on push to main
+# handles both halves of the release train:
+#   1. pending intent files (.changesets/*.md) exist
+#        → apply the computed train onto the version branch and open/update
+#          the "chore: version packages" pull request;
+#   2. this push IS the version-PR merge (commit message match + the train
+#      artifact present at HEAD)
+#        → push one <package>-v<version> tag per release and dispatch one
+#          publish workflow run per tag.
+#
+# Per-tag fan-out is pub.dev's architecture: automated publishing is
+# ref-gated to the package's own tag, so a single run cannot publish a whole
+# train. Ordering emerges from dependency waits plus skip-existing
+# self-healing inside the publish workflow.
+#
+# Usage (consumer repository, .github/workflows/release.yml):
+#   name: Release
+#   on: { push: { branches: [main] } }
+#   jobs:
+#     release:
+#       runs-on: ubuntu-latest
+#       steps:
+#         - uses: actions/checkout@v4
+#           with: { fetch-depth: 0 }
+#         - uses: Arenukvern/dart_changesets@v1
+#           env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+#
+# Plus a publish workflow (see example/consumer-workflows/publish.yml).
+name: dart_changesets
+description: >-
+  Changesets-style release engine for Dart: intent files → version PR →
+  per-tag pub.dev publish dispatch.
+branding:
+  icon: tag
+  color: blue
+
+inputs:
+  engine-repo:
+    description: >
+      Repository to install the engine from. Defaults to the repository
+      this action was loaded from.
+    required: false
+    default: ''
+  engine-ref:
+    description: >
+      Ref of the engine repository to install. Defaults to the ref this
+      action was loaded from, falling back to main.
+    required: false
+    default: ''
+  cwd:
+    description: The consumer repository working directory.
+    required: false
+    default: '.'
+  branch:
+    description: The version-PR branch.
+    required: false
+    default: 'changesets/version-packages'
+  commit:
+    description: The version-PR commit message (also the merge detector).
+    required: false
+    default: 'chore: version packages'
+  title:
+    description: The version-PR title.
+    required: false
+    default: 'chore: version packages'
+  setup-git-user:
+    description: Configure the github-actions bot identity before pushing.
+    required: false
+    default: 'true'
+  publish:
+    description: >
+      Push tags and dispatch publish runs when this push merged the version
+      PR. Set false to only ever assemble version PRs.
+    required: false
+    default: 'true'
+  publish-workflow:
+    description: >
+      Consumer workflow file dispatched per tag (must accept `tag` and
+      `execute` workflow_dispatch inputs).
+    required: false
+    default: 'publish.yml'
+
+runs:
+  using: composite
+  steps:
+    - uses: dart-lang/setup-dart@v1
+
+    - name: Install dart_changesets engine
+      id: engine
+      shell: bash
+      env:
+        INPUT_ENGINE_REPO: ${{ inputs.engine-repo }}
+        INPUT_ENGINE_REF: ${{ inputs.engine-ref }}
+      run: |
+        set -euo pipefail
+        repo="${INPUT_ENGINE_REPO:-${GITHUB_ACTION_REPOSITORY:-Arenukvern/dart_changesets}}"
+        ref="${INPUT_ENGINE_REF:-${GITHUB_ACTION_REF:-main}}"
+        echo "engine: $repo @ $ref"
+        dart pub global activate --source git \
+          "https://github.com/${repo}.git" --git-ref "$ref"
+
+    - name: Detect mode
+      id: mode
+      shell: bash
+      working-directory: ${{ inputs.cwd }}
+      env:
+        COMMIT_PREFIX: ${{ inputs.commit }}
+        INPUT_PUBLISH: ${{ inputs.publish }}
+      run: |
+        set -euo pipefail
+        # Pending intent files (README.md and dot-files excluded by the engine).
+        pending=$(find .changesets -maxdepth 1 -name '*.md' ! -name 'README.md' ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
+        train=".changesets/.pending-train.json"
+        head_msg="$(git log -1 --pretty=%s)"
+
+        if [ "$pending" -gt 0 ]; then
+          echo "result=assemble" >> "$GITHUB_OUTPUT"
+        elif [ "$INPUT_PUBLISH" = "true" ] && [ -f "$train" ] && [[ "$head_msg" == "$COMMIT_PREFIX"* ]]; then
+          echo "result=release" >> "$GITHUB_OUTPUT"
+        else
+          echo "result=none" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Assemble version PR
+      if: steps.mode.outputs.result == 'assemble'
+      shell: bash
+      working-directory: ${{ inputs.cwd }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        BRANCH: ${{ inputs.branch }}
+        COMMIT: ${{ inputs.commit }}
+        TITLE: ${{ inputs.title }}
+        SETUP_GIT_USER: ${{ inputs.setup-git-user }}
+      run: |
+        set -euo pipefail
+        if [ "$SETUP_GIT_USER" = "true" ]; then
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        fi
+        if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+          git fetch origin "$BRANCH"
+          git checkout -B "$BRANCH" "origin/$BRANCH"
+        else
+          git checkout -B "$BRANCH"
+        fi
+        dart_changesets version
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "No file changes after apply — nothing to commit."
+          exit 0
+        fi
+        git add -A
+        git commit -m "$COMMIT"
+        git push --force-with-lease origin "$BRANCH"
+        body=$(cat .changesets/.pending-train.json)
+        if gh pr view "$BRANCH" --json state --jq .state >/dev/null 2>&1; then
+          gh pr edit "$BRANCH" --body "Release train:"$'\n'"$body"
+        else
+          gh pr create --base main --head "$BRANCH" \
+            --title "$TITLE" \
+            --body "Release train:"$'\n'"$body"$'\n\n'"Merging pushes one tag per package and dispatches one publish run per tag."
+        fi
+
+    - name: Push tags and dispatch publish runs
+      if: >-
+        inputs.publish == 'true' && steps.mode.outputs.result == 'release'
+      shell: bash
+      working-directory: ${{ inputs.cwd }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PUBLISH_WORKFLOW: ${{ inputs.publish-workflow }}
+      run: |
+        set -euo pipefail
+        merge_sha="$(git rev-parse HEAD)"
+        for tag in $(dart_changesets tags | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin)))'); do
+          echo "== $tag =="
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "tag exists; skipping creation"
+          else
+            git tag "$tag" "$merge_sha"
+            git push origin "$tag"
+          fi
+          gh workflow run "$PUBLISH_WORKFLOW" \
+            --ref "$GITHUB_REF_NAME" \
+            -f tag="$tag" \
+            -f execute=true
+        done
+
+    - name: Nothing to do
+      if: steps.mode.outputs.result == 'none'
+      shell: bash
+      run: echo "No pending changesets and no version-PR merge — nothing to release."

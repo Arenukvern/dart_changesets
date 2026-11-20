@@ -1,0 +1,35 @@
+# Consumer template: .github/workflows/release.yml
+# The single workflow every adopting repository needs on push to main.
+# The action assembles the version PR from pending intent files and, when
+# the version PR merges, pushes tags and dispatches publish runs.
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dart-changesets-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: Arenukvern/dart_changesets@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Optional inputs (defaults shown):
+        #   branch: changesets/version-packages
+        #   commit: chore: version packages
+        #   publish-workflow: publish.yml
+        #   engine-ref: v1
