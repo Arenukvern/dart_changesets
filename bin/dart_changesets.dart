@@ -19,7 +19,25 @@ Future<void> main(List<String> arguments) async {
     )
     ..addCommand('doctor', ArgParser()
       ..addFlag('no-network', negatable: false, help: 'Skip the pub.dev presence census.'))
-    ..addCommand('tags')
+    ..addCommand(
+      'tags',
+      ArgParser()
+        ..addFlag('plain', negatable: false, help: 'Print tags space-separated (CI-friendly) instead of JSON.'),
+    )
+    ..addCommand(
+      'product-release',
+      ArgParser()
+        ..addOption(
+          'tag',
+          help: 'Per-package publish tag — prints the product tag when the tag names the product package.',
+        ),
+    )
+    ..addCommand(
+      'release-notes',
+      ArgParser()
+        ..addOption('package', help: 'Package whose CHANGELOG section becomes the release notes.')
+        ..addOption('version', help: 'Version heading to extract, e.g. 7.2.1.'),
+    )
     ..addCommand(
       'runner',
       ArgParser()
@@ -81,7 +99,15 @@ Future<void> main(List<String> arguments) async {
         census: !(args.command!['no-network'] as bool),
       ));
     case 'tags':
-      exit(runTags(changesetsDir));
+      exit(runTags(changesetsDir, plain: args.command!['plain'] as bool));
+    case 'product-release':
+      exit(runProductRelease(
+        changesetsDir,
+        config,
+        tag: args.command!['tag'] as String?,
+      ));
+    case 'release-notes':
+      exit(runReleaseNotes(graph, args.command!));
     case 'runner':
       exit(await runRunner(args.command!));
     case 'publish-tag':
@@ -254,6 +280,7 @@ Future<int> runVersion(
     changesetsDir: changesetsDir,
     config: config,
     privateRewrites: plan.privateConstraintRewrites,
+    repoRoot: repoRoot,
   );
   print('Wrote ${applied.writtenFiles.length} file(s):');
   for (final path in applied.writtenFiles) {
@@ -314,7 +341,7 @@ Future<int> runDoctorCommand(
 // tags
 // ---------------------------------------------------------------------------
 
-int runTags(String changesetsDir) {
+int runTags(String changesetsDir, {required bool plain}) {
   final file = File(p.join(changesetsDir, pendingTrainFileName));
   if (!file.existsSync()) {
     stderr.writeln(
@@ -328,7 +355,84 @@ int runTags(String changesetsDir) {
     for (final entry in list)
       (entry as Map<String, dynamic>)['tag'] as String,
   ];
-  print(jsonEncode(tags));
+  // Replaces the python JSON one-liner in action.yml: plain output parses
+  // with shell word-splitting alone.
+  print(plain ? tags.join(' ') : jsonEncode(tags));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// product-release / release-notes
+// ---------------------------------------------------------------------------
+
+/// Release mode (no --tag): prints `tag=`, `package=`, `version=` lines when
+/// the product package is part of the pending train; prints nothing (exit 0)
+/// when there is no product or it is not in this train — the action skips
+/// tag/release creation entirely.
+///
+/// Publish mode (--tag): prints the product tag when the given per-package
+/// tag names the product package; prints nothing otherwise. The reusable
+/// publish workflow gates its post-publish downstream dispatch on this.
+int runProductRelease(
+  String changesetsDir,
+  ChangesetsConfig config, {
+  String? tag,
+}) {
+  if (tag != null) {
+    final productTag = productTagForPublishTag(config: config, tag: tag);
+    if (productTag != null) print(productTag);
+    return 0;
+  }
+  final release = resolveProductRelease(
+    config: config,
+    changesetsDir: changesetsDir,
+  );
+  if (release != null) {
+    print('tag=${release.tag}');
+    print('package=${release.package}');
+    print('version=${release.version}');
+  }
+  return 0;
+}
+
+/// Prints the release notes (the package's new changelog section) for the
+/// version named on the command line.
+int runReleaseNotes(WorkspaceGraph graph, ArgResults args) {
+  final packageName = args['package'] as String?;
+  final version = args['version'] as String?;
+  if (packageName == null || packageName.isEmpty) {
+    stderr.writeln('dart_changesets: release-notes requires --package.');
+    return 64;
+  }
+  if (version == null || version.isEmpty) {
+    stderr.writeln('dart_changesets: release-notes requires --version.');
+    return 64;
+  }
+  final pkg = graph.packages[packageName];
+  if (pkg == null) {
+    stderr.writeln('dart_changesets: "$packageName" is not a workspace package.');
+    return 64;
+  }
+  final changelogPath =
+      '${pkg.directory}${Platform.pathSeparator}CHANGELOG.md';
+  final file = File(changelogPath);
+  if (!file.existsSync()) {
+    stderr.writeln(
+      'dart_changesets: no CHANGELOG.md at $changelogPath.',
+    );
+    return 1;
+  }
+  final notes = extractReleaseNotes(
+    changelog: file.readAsStringSync(),
+    version: version,
+  );
+  if (notes == null) {
+    stderr.writeln(
+      'dart_changesets: CHANGELOG.md has no section for $version.',
+    );
+    return 1;
+  }
+  print(notes);
   return 0;
 }
 

@@ -38,5 +38,10 @@ jobs:
       # SDK is installed only when the workspace actually needs it).
       # Pin an exact version only when your workspace's resolution needs it:
       # flutter-version: '3.47.5'
+      # Optional: dispatch a downstream workflow (e.g. binary builds) AFTER
+      # this tag's publish succeeds, when the tag names the product package
+      # configured under product_tag in changesets.yaml:
+      # product-dispatch-workflow: release.yml
+      # product-dispatch-input: release_tag
       # Optional: pin the engine ref (defaults to the action's own ref).
       # engine-ref: v1

@@ -44,6 +44,23 @@ on:
         required: false
         type: string
         default: ''
+      product-dispatch-workflow:
+        description: >
+          Consumer workflow file dispatched (workflow_dispatch) AFTER this
+          tag's publish succeeds, when the tag names the configured product
+          package (product_tag in changesets.yaml). This is the correct hook
+          point for binary/registry builds: at version-PR merge time the
+          publish legs have not landed yet, so a build resolving the new
+          versions would fail. Empty = no dispatch (chain a `needs:` job in
+          your own per-tag workflow instead).
+        required: false
+        type: string
+        default: ''
+      product-dispatch-input:
+        description: 'Input name receiving the product tag in the dispatched workflow.'
+        required: false
+        type: string
+        default: 'tag'
 
 jobs:
   publish:
@@ -91,3 +108,20 @@ jobs:
           if [ "${{ inputs.execute }}" = "true" ]; then execute_flag="--execute"; fi
           dart_changesets publish-tag \
             --tag "${{ inputs.tag }}" $execute_flag --skip-existing
+
+      # Fires only for the product package's tag and only after the publish
+      # succeeded — a GITHUB_TOKEN tag push fires no push workflows, so this
+      # explicit dispatch is how downstream product builds start.
+      - name: Dispatch product workflow
+        if: inputs.product-dispatch-workflow != '' && inputs.execute
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ptag="$(dart_changesets product-release --tag "${{ inputs.tag }}")"
+          if [ -z "$ptag" ]; then
+            echo "not the product tag; nothing to dispatch"
+            exit 0
+          fi
+          gh workflow run "${{ inputs.product-dispatch-workflow }}" \
+            --ref "${{ github.ref_name }}" \
+            -f "${{ inputs.product-dispatch-input }}=$ptag"
