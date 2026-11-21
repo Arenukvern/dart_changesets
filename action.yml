@@ -185,12 +185,14 @@ runs:
         # pushed the branch but failed to create the PR (e.g. the repo-level
         # "Allow GitHub Actions to create and approve pull requests" setting
         # was off), and a re-run must repair that instead of exiting early.
+        # A merged/closed PR for this branch does NOT count — the branch was
+        # rewritten above, so a fresh PR must be created.
         if [ -f .changesets/.pending-train.json ]; then
           body=$(cat .changesets/.pending-train.json)
         else
           body="Release train"
         fi
-        if gh pr view "$BRANCH" --json state --jq .state >/dev/null 2>&1; then
+        if [ "$pr_state" = "OPEN" ]; then
           gh pr edit "$BRANCH" --body "Release train:"$'\n'"$body"
         else
           gh pr create --base main --head "$BRANCH" \
