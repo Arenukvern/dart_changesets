@@ -98,10 +98,64 @@ packages_dir: pkgs          # where packages live (default: pkgs)
 root_package: false         # single-package repos: include the root pubspec
 dependent_bump: patch       # bump applied to dependents whose constraint changed
 tag_format: '{package}-v{version}'
+
+# Optional: one package whose release ALSO gets a product tag + GitHub
+# release at the version-PR merge commit (exactly once per train, idempotent).
+product_tag:
+  package: flutter_mcp_toolkit_server   # pubspec `name:`, not the directory
+  format: 'v{version}'
+
+# Optional: version strings outside pubspec that move with a package's
+# release. Missing files, drifted versions, and ambiguous patterns fail
+# loudly — never touch unrelated occurrences.
+version_files:
+  flutter_mcp_toolkit_server:
+    - path: VERSION
+      pattern: '{version}'
+    - path: mcp_server_dart/server.json
+      pattern: '"version": "{version}"'
 ```
 
 Packages marked `publish_to: none` are private automatically and never
 released; the doctor gate fails when a publishable package depends on one.
+
+### Product tag → GitHub release → binaries
+
+When `product_tag` is configured and that package is in the train, the
+version-PR merge creates `v{version}` on the merge commit and a GitHub
+release whose notes are that package's new changelog section. Downstream
+builds (binaries, registry) must start AFTER the product package's publish
+leg succeeds — at merge time the new dependency versions are not on pub.dev
+yet, so a build resolving them fails. Two supported wirings:
+
+```yaml
+# Option A (recommended): chain in your per-tag workflow — ordering is
+# guaranteed by needs:, zero extra engine config.
+jobs:
+  publish:
+    uses: Arenukvern/dart_changesets/.github/workflows/publish.yml@v1
+    with: { tag: ${{ github.event.inputs.tag || github.ref_name }}, execute: true }
+  binaries:
+    needs: publish
+    if: startsWith(github.event.inputs.tag || github.ref_name, 'flutter_mcp_toolkit_server-v')
+    uses: ./.github/workflows/release.yml
+    with: { release_tag: ${{ github.event.inputs.tag || github.ref_name }} }
+
+# Option B: let the reusable publish workflow dispatch for you (fires only
+# for the product package's tag, only after publish succeeded):
+#   with:
+#     product-dispatch-workflow: release.yml
+#     product-dispatch-input: release_tag
+```
+
+### Token
+
+The action's `token` input (default `github.token`) is used for every
+branch push, PR create/edit, tag push, release creation, and dispatch.
+Pushes made with `GITHUB_TOKEN` trigger no workflows — so the version PR
+runs no CI by default. A PAT (or App token) makes the version PR run full
+CI; the action overrides checkout's persisted credential so pushes really
+ride that token.
 
 ## CLI
 

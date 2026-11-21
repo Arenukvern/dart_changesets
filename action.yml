@@ -81,6 +81,16 @@ inputs:
       `execute` workflow_dispatch inputs).
     required: false
     default: 'publish.yml'
+  token:
+    description: >
+      Token used for every branch push, PR create/edit, tag push, release
+      creation and workflow dispatch. Defaults to github.token. A PAT (or
+      App token) makes the version PR run full CI: pushes made with
+      GITHUB_TOKEN trigger no workflows. Note that actions/checkout
+      persists its own credential in git config — when a custom token is
+      set, the action overrides that credential before pushing.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -100,6 +110,18 @@ runs:
         echo "engine: $repo @ $ref"
         dart pub global activate --source git \
           "https://github.com/${repo}.git" --git-ref "$ref"
+
+    # checkout@v4 persists its own credential in git config; a custom token
+    # must override it or pushes silently keep riding GITHUB_TOKEN (which
+    # fires no workflows).
+    - name: Override push credential with token
+      if: inputs.token != ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        git config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+        git config http.https://github.com/.extraheader \
+          "AUTHORIZATION: basic $(printf 'x-access-token:%s' "${{ inputs.token }}" | base64)"
 
     - name: Detect mode
       id: mode
@@ -128,7 +150,7 @@ runs:
       shell: bash
       working-directory: ${{ inputs.cwd }}
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.token || github.token }}
         BRANCH: ${{ inputs.branch }}
         COMMIT: ${{ inputs.commit }}
         TITLE: ${{ inputs.title }}
@@ -176,12 +198,12 @@ runs:
       shell: bash
       working-directory: ${{ inputs.cwd }}
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.token || github.token }}
         PUBLISH_WORKFLOW: ${{ inputs.publish-workflow }}
       run: |
         set -euo pipefail
         merge_sha="$(git rev-parse HEAD)"
-        for tag in $(dart_changesets tags | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin)))'); do
+        for tag in $(dart_changesets tags --plain); do
           echo "== $tag =="
           if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
             echo "tag exists; skipping creation"
@@ -194,6 +216,38 @@ runs:
             -f tag="$tag" \
             -f execute=true
         done
+
+        # Product tag + GitHub release: exactly once per train, idempotent.
+        # The engine computes the tag and the notes (action stays thin).
+        # Downstream builds must NOT be dispatched here — at merge time the
+        # pub.dev publish legs have not landed, so a binary build resolving
+        # the new versions would fail. Chain them off the publish run
+        # instead (needs: publish in the consumer's per-tag workflow) or
+        # set product-dispatch-workflow on the reusable publish workflow.
+        product_out="$(dart_changesets product-release)"
+        ptag="$(echo "$product_out" | sed -n 's/^tag=//p')"
+        if [ -n "$ptag" ]; then
+          ppkg="$(echo "$product_out" | sed -n 's/^package=//p')"
+          pver="$(echo "$product_out" | sed -n 's/^version=//p')"
+          echo "== product $ppkg → $ptag =="
+          if git rev-parse -q --verify "refs/tags/$ptag" >/dev/null; then
+            echo "product tag exists; skipping creation"
+          else
+            git tag "$ptag" "$merge_sha"
+            git push origin "$ptag"
+          fi
+          if gh release view "$ptag" --json id --jq .id >/dev/null 2>&1; then
+            echo "product release exists; skipping creation"
+          else
+            dart_changesets release-notes --package "$ppkg" \
+              --version "$pver" > product-notes.md
+            gh release create "$ptag" \
+              --target "$merge_sha" \
+              --title "$ptag" \
+              --notes-file product-notes.md
+            rm -f product-notes.md
+          fi
+        fi
 
     - name: Nothing to do
       if: steps.mode.outputs.result == 'none'

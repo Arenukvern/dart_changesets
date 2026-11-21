@@ -10,5 +10,6 @@ export 'src/bump.dart';
 export 'src/changeset.dart';
 export 'src/config.dart';
 export 'src/doctor.dart';
+export 'src/product.dart';
 export 'src/publish.dart';
 export 'src/workspace_graph.dart';
