@@ -48,6 +48,13 @@ pin `@v1` for the current major.
 No conventional-commit discipline is required — release intent lives in
 reviewed files, not commit messages.
 
+**One required repo setting** (GitHub default blocks bot-made PRs):
+Settings → Actions → General → Workflow permissions → check
+**Allow GitHub Actions to create and approve pull requests**. The version
+PR is created by `GITHUB_TOKEN`; with the setting off, assemble runs push
+the version branch but cannot open the PR (and the next assemble run
+repairs it once the setting is on).
+
 ## How it works
 
 ```yaml

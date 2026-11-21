@@ -147,13 +147,21 @@ runs:
         fi
         dart_changesets version
         if git diff --quiet && git diff --cached --quiet; then
-          echo "No file changes after apply — nothing to commit."
-          exit 0
+          echo "No file changes after apply — the version branch is current."
+        else
+          git add -A
+          git commit -m "$COMMIT"
+          git push --force-with-lease origin "$BRANCH"
         fi
-        git add -A
-        git commit -m "$COMMIT"
-        git push --force-with-lease origin "$BRANCH"
-        body=$(cat .changesets/.pending-train.json)
+        # The PR is ensured on every assemble run: an earlier run may have
+        # pushed the branch but failed to create the PR (e.g. the repo-level
+        # "Allow GitHub Actions to create and approve pull requests" setting
+        # was off), and a re-run must repair that instead of exiting early.
+        if [ -f .changesets/.pending-train.json ]; then
+          body=$(cat .changesets/.pending-train.json)
+        else
+          body="Release train"
+        fi
         if gh pr view "$BRANCH" --json state --jq .state >/dev/null 2>&1; then
           gh pr edit "$BRANCH" --body "Release train:"$'\n'"$body"
         else
