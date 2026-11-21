@@ -72,13 +72,23 @@ pub.dev's automated publishing authorizes ONLY workflows triggered by a
 And `GITHUB_TOKEN` tag pushes fire no workflows. Together: **automated
 publishing requires a PAT via the action's `token` input** (Contents:
 write), so the tag pushes the action makes START your push-triggered
-publish workflow with a pub.dev-authorized `push` event. Without it the
-train still assembles, tags, and runs preflight dry-runs per tag — but
-stops before publishing. Also required per package (owner-paced, web
-session): pub.dev package Admin → Automated publishing → repository +
-tag pattern. Rescue for a tag that already exists: delete it and push it
-again with the PAT (the push event is what pub.dev authorizes);
-skip-existing keeps re-runs idempotent.
+publish workflow with a pub.dev-authorized `push` event. This is the
+same role the release-please PAT played — repositories migrating from
+release-please already have it as the `RELEASE_PLEASE_TOKEN` secret:
+
+```yaml
+- uses: Arenukvern/dart_changesets@v1
+  with:
+    token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+  env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+```
+
+Without it the train still assembles, tags, and runs preflight dry-runs
+per tag — but stops before publishing. Also required per package
+(owner-paced, web session): pub.dev package Admin → Automated publishing
+→ repository + tag pattern. Rescue for a tag that already exists: delete
+it and push it again with the PAT (the push event is what pub.dev
+authorizes); skip-existing keeps re-runs idempotent.
 
 ## How it works
 

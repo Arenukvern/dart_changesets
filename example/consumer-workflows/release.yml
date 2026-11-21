@@ -35,8 +35,10 @@ jobs:
         # publishing only from tag-push events, and GITHUB_TOKEN tag pushes
         # fire no workflows — a PAT (Contents: write) makes the tag pushes
         # above start your push-triggered publish workflow. Unset → the
-        # train runs preflight-only and stops.
-        #   token: ${{ secrets.RELEASE_PAT }}
+        # train runs preflight-only and stops. Repos migrating from
+        # release-please already have this secret: RELEASE_PLEASE_TOKEN
+        # played exactly this role there.
+        #   token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         # Optional inputs (defaults shown):
         #   branch: changesets/version-packages
         #   commit: chore: version packages

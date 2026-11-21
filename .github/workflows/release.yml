@@ -36,9 +36,10 @@ jobs:
           # pub.dev authorizes automated publishing ONLY from tag-push
           # events, and GITHUB_TOKEN pushes fire no workflows — so real
           # publishes need a PAT here (unset → falls back to GITHUB_TOKEN
-          # and trains stop at preflight). Create a fine-grained PAT with
-          # Contents: write on this repo and add it as the RELEASE_PAT
-          # secret; it also makes version-PR pushes run full CI.
-          token: ${{ secrets.RELEASE_PAT }}
+          # and trains stop at preflight). This is the same role the
+          # release-please PAT played: reuse your existing
+          # RELEASE_PLEASE_TOKEN secret (Contents: write). It also makes
+          # version-PR pushes run full CI.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
