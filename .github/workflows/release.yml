@@ -25,5 +25,11 @@ jobs:
           fetch-depth: 0
 
       - uses: ./
+        with:
+          # The engine's own per-tag trigger workflow is self_publish.yml
+          # (this repo has no consumer-style publish.yml with
+          # workflow_dispatch — its publish.yml is the reusable
+          # workflow_call template).
+          publish-workflow: self_publish.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
