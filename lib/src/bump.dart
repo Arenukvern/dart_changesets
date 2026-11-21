@@ -46,7 +46,7 @@ final class ReleasePlan {
   final List<PlannedRelease> releases;
 
   /// Constraint rewrites for PRIVATE dependents (no release, but their
-  /// workspace resolution must still admit the new version): package name →
+  /// workspace resolution must still admit the new version): pubspec path →
   /// {dependency name → new constraint}.
   final Map<String, Map<String, String>> privateConstraintRewrites;
 
@@ -151,7 +151,10 @@ ReleasePlan computePlan({
       final newConstraint = '^${newVersion.canonicalizedVersion}';
       if (!dependent.publishable || config.ignore.contains(dependent.name)) {
         // Private dependents get constraint updates but never release.
-        (privateRewrites[dependent.name] ??= <String, String>{})[name] =
+        // Keyed by pubspec PATH: applyPlan materializes these rewrites by
+        // path (a name here crashed real trains on mixed-visibility repos,
+        // e.g. mcp_flutter 2026-11-21).
+        (privateRewrites[dependent.pubspecPath] ??= <String, String>{})[name] =
             newConstraint;
         continue;
       }

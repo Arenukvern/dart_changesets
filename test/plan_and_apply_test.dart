@@ -149,7 +149,46 @@ void main() {
           config: const ChangesetsConfig(),
         );
         expect(plan.releases.map((r) => r.package.name), ['core']);
-        expect(plan.privateConstraintRewrites['internal']?['core'], '^2.0.0');
+        final rewrites = plan.privateConstraintRewrites;
+        expect(rewrites.length, 1);
+        final key = rewrites.keys.single;
+        expect(key, endsWith('pkgs/internal/pubspec.yaml'));
+        expect(rewrites[key]?['core'], '^2.0.0');
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('applyPlan writes private dependent constraint rewrites by path',
+        () async {
+      final root = buildFixtureRepo(const {
+        'core': FixturePackage(version: '1.0.0'),
+        'internal': FixturePackage(
+          version: '1.0.0',
+          dependencies: {'core': '^1.0.0'},
+          publishToNone: true,
+        ),
+      });
+      final changeset = writeChangeset(root, 'one', "'core': major\n");
+      try {
+        final graph = await loadGraph(root.path);
+        final plan = computePlan(
+          graph: graph,
+          changesets: [changeset],
+          config: const ChangesetsConfig(),
+        );
+        applyPlan(
+          plan: plan,
+          consumedChangesetPaths: [changeset.path],
+          changesetsDir: '${root.path}/.changesets',
+          config: const ChangesetsConfig(),
+          privateRewrites: plan.privateConstraintRewrites,
+        );
+        final privatePubspec = File(
+          '${root.path}/pkgs/internal/pubspec.yaml',
+        ).readAsStringSync();
+        expect(privatePubspec, contains('core: ^2.0.0'));
+        expect(privatePubspec, contains('version: 1.0.0'));
       } finally {
         teardownRepo(root);
       }
