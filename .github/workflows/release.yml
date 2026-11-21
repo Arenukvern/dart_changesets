@@ -11,6 +11,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # workflow_dispatch creation (gh workflow run) needs actions: write.
+  actions: write
 
 concurrency:
   group: dart-changesets-self-release
