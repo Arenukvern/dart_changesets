@@ -65,6 +65,13 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # pub.dev's automated publishing can be configured to require a GitHub
+    # environment (the dart.dev publishing recipe uses pub.dev). The
+    # environment must be declared on a job INSIDE this reusable workflow —
+    # `environment` is not a legal key on a reusable-call job in the
+    # consumer's caller. GitHub creates the environment per caller repo on
+    # first use; owners add protection rules there if wanted.
+    environment: pub.dev
     timeout-minutes: 20
     steps:
       # Checks out the CALLER repository when invoked via workflow_call.
