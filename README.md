@@ -55,6 +55,13 @@ PR is created by `GITHUB_TOKEN`; with the setting off, assemble runs push
 the version branch but cannot open the PR (and the next assemble run
 repairs it once the setting is on).
 
+**Required workflow permissions** in your release workflow: `contents:
+write`, `pull-requests: write`, and `actions: write` — the last one
+because the action starts publish runs via `gh workflow run` (workflow
+dispatch creation). Without it, a version-PR merge pushes the tags but
+fails to start the publish runs; re-running the release workflow after
+granting the permission repairs it.
+
 ## How it works
 
 ```yaml
