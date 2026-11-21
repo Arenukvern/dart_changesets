@@ -161,7 +161,13 @@ runs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         fi
-        if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+        # Update the version branch in place only while its PR is OPEN.
+        # Once that PR is merged or closed, the branch's train is already on
+        # main — a stale branch would make the next assemble replay an old
+        # train (zero pending intents) instead of building the new one, so
+        # the branch must be recreated from the current main.
+        pr_state="$(gh pr view "$BRANCH" --json state --jq .state 2>/dev/null || echo none)"
+        if [ "$pr_state" = "OPEN" ] && git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
           git fetch origin "$BRANCH"
           git checkout -B "$BRANCH" "origin/$BRANCH"
         else
