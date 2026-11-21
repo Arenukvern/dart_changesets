@@ -64,6 +64,22 @@ RUN (a re-run checks out the original merge ref, so release mode
 detects again; a fresh dispatch on a moved main head correctly does
 nothing), or by dispatching the publish workflow per tag.
 
+### pub.dev authorization: the token input is what enables publishing
+
+pub.dev's automated publishing authorizes ONLY workflows triggered by a
+**tag push** — `workflow_dispatch` runs are rejected for real publishes
+([dart.dev/go/publishing-from-github](https://dart.dev/go/publishing-from-github)).
+And `GITHUB_TOKEN` tag pushes fire no workflows. Together: **automated
+publishing requires a PAT via the action's `token` input** (Contents:
+write), so the tag pushes the action makes START your push-triggered
+publish workflow with a pub.dev-authorized `push` event. Without it the
+train still assembles, tags, and runs preflight dry-runs per tag — but
+stops before publishing. Also required per package (owner-paced, web
+session): pub.dev package Admin → Automated publishing → repository +
+tag pattern. Rescue for a tag that already exists: delete it and push it
+again with the PAT (the push event is what pub.dev authorizes);
+skip-existing keeps re-runs idempotent.
+
 ## How it works
 
 ```yaml

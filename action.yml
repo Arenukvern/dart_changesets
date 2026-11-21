@@ -208,6 +208,7 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.token || github.token }}
         PUBLISH_WORKFLOW: ${{ inputs.publish-workflow }}
+        HAS_PAT: ${{ inputs.token != '' }}
       run: |
         set -euo pipefail
         merge_sha="$(git rev-parse HEAD)"
@@ -219,10 +220,21 @@ runs:
             git tag "$tag" "$merge_sha"
             git push origin "$tag"
           fi
-          gh workflow run "$PUBLISH_WORKFLOW" \
-            --ref "$GITHUB_REF_NAME" \
-            -f tag="$tag" \
-            -f execute=true
+          # pub.dev's automated publishing authorizes ONLY tag-push events —
+          # a workflow_dispatch run is rejected for real publishes
+          # (dart.dev/go/publishing-from-github). And GITHUB_TOKEN tag
+          # pushes fire no workflows. Together: real publishing requires
+          # the token input (a PAT) so the pushes above START the
+          # consumer's push-triggered publish workflow themselves.
+          if [ "$HAS_PAT" = "true" ]; then
+            echo "token input set: the push above fires the publish workflow (push event — pub.dev-authorized); no dispatch."
+          else
+            echo "no token input (GITHUB_TOKEN): the push fired nothing; dispatching a PREFLIGHT run (execute=false). pub.dev rejects workflow_dispatch publishes — provide a PAT via the token input for real publishes."
+            gh workflow run "$PUBLISH_WORKFLOW" \
+              --ref "$GITHUB_REF_NAME" \
+              -f tag="$tag" \
+              -f execute=false
+          fi
         done
 
         # Product tag + GitHub release: exactly once per train, idempotent.

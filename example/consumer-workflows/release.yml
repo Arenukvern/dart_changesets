@@ -31,6 +31,12 @@ jobs:
       - uses: Arenukvern/dart_changesets@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # REQUIRED for real pub.dev publishes: pub.dev authorizes automated
+        # publishing only from tag-push events, and GITHUB_TOKEN tag pushes
+        # fire no workflows — a PAT (Contents: write) makes the tag pushes
+        # above start your push-triggered publish workflow. Unset → the
+        # train runs preflight-only and stops.
+        #   token: ${{ secrets.RELEASE_PAT }}
         # Optional inputs (defaults shown):
         #   branch: changesets/version-packages
         #   commit: chore: version packages
