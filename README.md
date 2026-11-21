@@ -59,8 +59,10 @@ repairs it once the setting is on).
 write`, `pull-requests: write`, and `actions: write` — the last one
 because the action starts publish runs via `gh workflow run` (workflow
 dispatch creation). Without it, a version-PR merge pushes the tags but
-fails to start the publish runs; re-running the release workflow after
-granting the permission repairs it.
+fails to start the publish runs. Repair by re-running the failed release
+RUN (a re-run checks out the original merge ref, so release mode
+detects again; a fresh dispatch on a moved main head correctly does
+nothing), or by dispatching the publish workflow per tag.
 
 ## How it works
 
