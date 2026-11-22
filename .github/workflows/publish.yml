@@ -61,11 +61,22 @@ on:
         required: false
         type: string
         default: 'tag'
+      dependency-wait-minutes:
+        description: >
+          How long publish-tag waits for same-train dependency floors to land
+          on pub.dev before failing (runs poll with progress logs). Raise it
+          for workspaces whose members take minutes to build and publish;
+          0 disables the wait and fails fast on a racing train.
+        required: false
+        type: string
+        default: '15'
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Worst case: full dependency-wait budget + setup + dry-run + publish +
+    # visibility poll must fit.
+    timeout-minutes: 30
     steps:
       # Checks out the CALLER repository when invoked via workflow_call.
       - uses: actions/checkout@v4
@@ -107,7 +118,8 @@ jobs:
           execute_flag=""
           if [ "${{ inputs.execute }}" = "true" ]; then execute_flag="--execute"; fi
           dart_changesets publish-tag \
-            --tag "${{ inputs.tag }}" $execute_flag --skip-existing
+            --tag "${{ inputs.tag }}" $execute_flag --skip-existing \
+            --dependency-wait-minutes "${{ inputs.dependency-wait-minutes }}"
 
       # Fires only for the product package's tag and only after the publish
       # succeeded — a GITHUB_TOKEN tag push fires no push workflows, so this

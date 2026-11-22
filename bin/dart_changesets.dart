@@ -53,7 +53,12 @@ Future<void> main(List<String> arguments) async {
       ArgParser()
         ..addOption('tag', help: 'Release tag, e.g. <package>-v<version>. Defaults to GITHUB_REF_NAME.')
         ..addFlag('execute', negatable: false, help: 'Publish for real (omit = preflight only).')
-        ..addFlag('skip-existing', defaultsTo: true, help: 'Skip when pub.dev already exposes the version.'),
+        ..addFlag('skip-existing', defaultsTo: true, help: 'Skip when pub.dev already exposes the version.')
+        ..addOption(
+          'dependency-wait-minutes',
+          defaultsTo: '15',
+          help: 'How long to wait for same-train dependency floors to land on pub.dev before failing.',
+        ),
     );
 
   ArgResults args;
@@ -511,6 +516,15 @@ Future<int> runPublishTag(
     );
     return publishExitUsage;
   }
+  final waitMinutes =
+      int.tryParse(args['dependency-wait-minutes'] as String);
+  if (waitMinutes == null || waitMinutes < 0) {
+    stderr.writeln(
+      'dart_changesets: --dependency-wait-minutes must be a non-negative '
+      'integer (got "${args['dependency-wait-minutes']}").',
+    );
+    return publishExitUsage;
+  }
   return publishTag(
     repoRoot,
     config: config,
@@ -518,6 +532,7 @@ Future<int> runPublishTag(
     tag: tag,
     execute: args['execute'] as bool,
     skipExisting: args['skip-existing'] as bool,
+    dependencyWait: Duration(minutes: waitMinutes),
     pubDevClient: HttpPubDevClient(),
   );
 }
