@@ -282,4 +282,100 @@ void main() {
       }
     });
   });
+
+  group('dependency wait', () {
+    test('converges when a same-train sibling lands mid-wait', () async {
+      // The oka 0.12 train shape (2026-11-22): the dependent's publish run
+      // starts alongside its dependency's; the dependency's versions become
+      // visible on pub.dev only after that sibling's upload+visibility poll.
+      final root = buildFixtureRepo(const {
+        'a': FixturePackage(
+          version: '1.0.0',
+          dependencies: {'b': '^1.0.0'},
+        ),
+        'b': FixturePackage(version: '1.0.0'),
+      });
+      File('${root.path}/pkgs/a/CHANGELOG.md').writeAsStringSync('## 1.0.0\n\n- x\n');
+      final inner = FakePubDevClient(const {
+        'a': ['0.9.0'],
+        'b': ['0.9.0', '1.0.0'],
+      });
+      final lateB = _LateVisibleClient(inner, lateFor: 'b', firstOpenCalls: 2);
+      try {
+        final graph = await loadGraph(root.path);
+        final code = await publishTag(
+          root.path,
+          config: const ChangesetsConfig(),
+          graph: graph,
+          tag: 'a-v1.0.0',
+          execute: false,
+          skipExisting: true,
+          pubDevClient: lateB,
+          dependencyPoll: Duration.zero,
+        );
+        // The wait must converge (never 66); the flow then proceeds past the
+        // dependency gate into the strict dry-run, which fails in the fixture
+        // environment — same seam as the heading-acceptance test above.
+        expect(code, isNot(publishExitDependencyTimeout));
+        expect(lateB.callsFor('b'), greaterThanOrEqualTo(3));
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('expired budget fails with the dependency-timeout exit code', () async {
+      final root = buildFixtureRepo(const {
+        'a': FixturePackage(
+          version: '1.0.0',
+          dependencies: {'b': '^2.0.0'},
+        ),
+        'b': FixturePackage(version: '1.0.0'),
+      });
+      File('${root.path}/pkgs/a/CHANGELOG.md').writeAsStringSync('## 1.0.0\n\n- x\n');
+      try {
+        final graph = await loadGraph(root.path);
+        final code = await publishTag(
+          root.path,
+          config: const ChangesetsConfig(),
+          graph: graph,
+          tag: 'a-v1.0.0',
+          execute: false,
+          skipExisting: true,
+          pubDevClient: FakePubDevClient(const {
+            'a': ['0.9.0'],
+            'b': ['1.0.0'],
+          }),
+          dependencyWait: Duration.zero,
+        );
+        expect(code, publishExitDependencyTimeout);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+  });
+}
+
+/// Wraps a client and hides a package's versions for its first N `versions`
+/// calls — simulates a sibling whose upload has not landed yet.
+final class _LateVisibleClient implements PubDevClient {
+  _LateVisibleClient(this.inner, {required this.lateFor, required this.firstOpenCalls});
+
+  final PubDevClient inner;
+  final String lateFor;
+  final int firstOpenCalls;
+  final Map<String, int> _calls = {};
+
+  int callsFor(String package) => _calls[package] ?? 0;
+
+  @override
+  Future<PubDevInfo> lookup(String package) => inner.lookup(package);
+
+  @override
+  Future<List<String>> versions(String package) async {
+    _calls[package] = (_calls[package] ?? 0) + 1;
+    if (package == lateFor && _calls[package]! <= firstOpenCalls) {
+      return const <String>[];
+    }
+    return inner.versions(package);
+  }
 }

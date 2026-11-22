@@ -32,7 +32,8 @@ Future<int> publishTag(
   required bool execute,
   required bool skipExisting,
   required PubDevClient pubDevClient,
-  Duration dependencyWait = const Duration(seconds: 240),
+  Duration dependencyWait = const Duration(minutes: 15),
+  Duration dependencyPoll = const Duration(seconds: 10),
   Duration visibilityWait = const Duration(seconds: 300),
 }) async {
   final parsed = config.parseTag(tag.trim());
@@ -146,6 +147,8 @@ pub.dev cannot automate a package's first release:
   if (unsatisfied.isNotEmpty) {
     final deadline = DateTime.now().add(dependencyWait);
     final pending = Map.of(unsatisfied);
+    // Progress per poll round: a train wait can run for many minutes while a
+    // build-heavy sibling lands, and a silent CI job looks hung.
     while (DateTime.now().isBefore(deadline) && pending.isNotEmpty) {
       for (final name in pending.keys.toList()) {
         final visible = await _visibleVersions(pubDevClient, name);
@@ -158,18 +161,32 @@ pub.dev cannot automate a package's first release:
             return false;
           }
         });
-        if (satisfied) pending.remove(name);
+        if (satisfied) {
+          print(
+            'OK: $name satisfies ${constraint.toString()}; '
+            '${pending.length - 1} dependency(ies) still pending.',
+          );
+          pending.remove(name);
+        }
       }
       if (pending.isEmpty) break;
-      await Future<void>.delayed(const Duration(seconds: 10));
+      final elapsed =
+          dependencyWait - deadline.difference(DateTime.now());
+      print(
+        'waiting for pub.dev: ${pending.keys.join(', ')} '
+        '(${elapsed.inSeconds}s/${dependencyWait.inSeconds}s budget)',
+      );
+      await Future<void>.delayed(dependencyPoll);
     }
     if (pending.isNotEmpty) {
       stderr.writeln('''
-FAIL: pub.dev does not yet expose versions of ${pending.keys.toList()}
-      satisfying this package's constraints. An upstream release train is
-      still landing. Re-run this publish after the dependency publishes
-      (skip-existing keeps completed packages untouched).
-''');
+FAIL: pub.dev did not expose versions of ${pending.keys.toList()}
+      satisfying this package's constraints within
+      ${dependencyWait.inSeconds}s. An upstream release train is still
+      landing (a build-heavy sibling can take several minutes to resolve,
+      dry-run, upload, and become visible). Re-dispatch this publish
+      (workflow_dispatch with the tag, execute checked) once the sibling
+      landed — skip-existing keeps completed packages untouched.''');
       return publishExitDependencyTimeout;
     }
   }

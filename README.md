@@ -146,8 +146,11 @@ carries both in its README badge row.
   never install it), installs the SDK from the stable channel (latest by
   default; cache enabled) when needed, then
   runs static checks → skip-existing → typed BOOTSTRAP gate for never-published
-  packages → dependency wait → strict dry-run → `pub publish --force` (OIDC)
-  → wait for pub.dev visibility.
+  packages → dependency wait (15 minutes by default, progress logged per
+  poll; `--dependency-wait-minutes` / the reusable workflow's
+  `dependency-wait-minutes` input configure it — this is how concurrent
+  per-tag runs converge on a train without manual re-dispatches) → strict
+  dry-run → `pub publish --force` (OIDC) → wait for pub.dev visibility.
 
 ## Configuration
 
@@ -235,7 +238,7 @@ dart_changesets version [--check]  # apply (or detect) the version train
 dart_changesets doctor [--no-network]  # gates + pub.dev census
 dart_changesets tags               # tags for the pending train (JSON)
 dart_changesets runner --tag <pkg>-v<semver>   # dart | flutter
-dart_changesets publish-tag --tag <pkg>-v<semver> [--execute] [--skip-existing]
+dart_changesets publish-tag --tag <pkg>-v<semver> [--execute] [--skip-existing] [--dependency-wait-minutes 15]
 ```
 
 ## Bootstrap (first publish of a new package)
