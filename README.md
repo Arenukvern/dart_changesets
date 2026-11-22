@@ -100,7 +100,8 @@ auto-creates in every consumer repo. Enabling pub.dev's optional
 that package's publish FAIL with an environment-mismatch error, because the
 token carries no environment claim — leave the checkbox off, or add an
 `environment` input to this workflow first if a consumer genuinely wants
-reviewer-gated publishing.
+reviewer-gated publishing. Decision record:
+[docs/decisions/0001-no-github-environment-in-publish-path.md](docs/decisions/0001-no-github-environment-in-publish-path.md).
 
 ## How it works
 

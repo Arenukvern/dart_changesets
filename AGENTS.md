@@ -32,3 +32,5 @@ dart test
 - `.github/workflows/publish.yml` — reusable per-tag publish workflow
   (workflow_call); consumers wrap it with their own trigger workflow.
 - `example/consumer-workflows/` — copy-paste consumer templates.
+- `docs/decisions/` — engine ADRs (0001: why the publish path declares no
+  GitHub environment).
