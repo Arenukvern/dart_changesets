@@ -103,6 +103,27 @@ token carries no environment claim — leave the checkbox off, or add an
 reviewer-gated publishing. Decision record:
 [docs/decisions/0001-no-github-environment-in-publish-path.md](docs/decisions/0001-no-github-environment-in-publish-path.md).
 
+## Show your release train (consumer badge)
+
+Two optional README badges for consumer repositories — train health and
+attribution:
+
+```markdown
+[![release train](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/dart_changesets.yml?branch=main&label=release%20train&logo=github)](https://github.com/OWNER/REPO/actions/workflows/dart_changesets.yml)
+[![release engine: dart_changesets](https://img.shields.io/badge/release_engine-dart__changesets-0175C2?logo=dart&logoColor=white)](https://github.com/Arenukvern/dart_changesets)
+```
+
+- The **release train** badge mirrors your `dart_changesets.yml` (release
+  workflow) latest run on the default branch. Red is the first visible
+  signal the train broke — most often the workflow-permission setting above.
+- The **release engine** badge is static attribution to this repository.
+- If a repo avoids third-party image hosts, GitHub's native badge also works:
+  `https://github.com/OWNER/REPO/actions/workflows/dart_changesets.yml/badge.svg`
+  (it shows the workflow's own display name).
+
+Live example: [flutter-mcp-toolkit](https://github.com/Arenukvern/mcp_flutter)
+carries both in its README badge row.
+
 ## How it works
 
 ```yaml
