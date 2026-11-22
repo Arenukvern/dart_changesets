@@ -90,6 +90,18 @@ per tag — but stops before publishing. Also required per package
 it and push it again with the PAT (the push event is what pub.dev
 authorizes); skip-existing keeps re-runs idempotent.
 
+**No GitHub Actions `environment` is declared anywhere in this workflow — by
+design** (dart-lang/core publishes the same way). The token's repository +
+tag-pattern + pubspec-version checks are the authorization; repo-local
+hardening belongs in a tag-protection ruleset (restrict who can push
+`<package>-v*` tags), not in an environment object that silently
+auto-creates in every consumer repo. Enabling pub.dev's optional
+"Require GitHub Actions environment" checkbox on a package Admin page makes
+that package's publish FAIL with an environment-mismatch error, because the
+token carries no environment claim — leave the checkbox off, or add an
+`environment` input to this workflow first if a consumer genuinely wants
+reviewer-gated publishing.
+
 ## How it works
 
 ```yaml
