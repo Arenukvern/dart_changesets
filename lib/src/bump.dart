@@ -158,11 +158,31 @@ ReleasePlan computePlan({
             newConstraint;
         continue;
       }
+      final note = 'Updated `$name` dependency constraint to `$newConstraint`.';
+      if (plannedEntries.containsKey(dependent.name)) {
+        // Already planned — the queue is alphabetical, so a DECLARED
+        // dependent can be planned before its dependency (oka 2026-11-22:
+        // oka_app_gallery declared in the same train as the oka_core minor
+        // it depends on, and `oka_app…` sorts before `oka_core`). Merge the
+        // rewrite into the existing release; pendingRewrites would never
+        // be consumed.
+        final existing = plannedEntries[dependent.name]!;
+        plannedEntries[dependent.name] = PlannedRelease(
+          package: existing.package,
+          newVersion: existing.newVersion,
+          bumpType: existing.bumpType,
+          changelogEntries: [...existing.changelogEntries, note],
+          isDependentBump: existing.isDependentBump,
+          constraintRewrites: {
+            ...existing.constraintRewrites,
+            name: newConstraint,
+          },
+        );
+        continue;
+      }
       (pendingRewrites[dependent.name] ??= <String, String>{})[name] =
           newConstraint;
-      (pendingNotes[dependent.name] ??= <String>[]).add(
-        'Updated `$name` dependency constraint to `$newConstraint`.',
-      );
+      (pendingNotes[dependent.name] ??= <String>[]).add(note);
       if (!plannedVersions.containsKey(dependent.name)) {
         plannedVersions[dependent.name] = dependent.version;
         queue.add(dependent.name);

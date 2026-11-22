@@ -198,6 +198,36 @@ void main() {
       }
     });
 
+    test('a declared dependent planned before its dependency still gets '
+        'the constraint rewrite', () async {
+      // `a` sorts before `core` and BOTH are declared: when `a` is planned,
+      // core's new version does not exist yet — the rewrite must reach `a`
+      // anyway (oka 2026-11-22: oka_app_gallery missed its oka_core bump).
+      final root = buildFixtureRepo(const {
+        'a': FixturePackage(version: '0.13.0', dependencies: {'core': '^0.13.0'}),
+        'core': FixturePackage(version: '0.13.0'),
+      });
+      try {
+        final graph = await loadGraph(root.path);
+        final plan = computePlan(
+          graph: graph,
+          changesets: [
+            writeChangeset(root, 'one', "'a': minor\n'core': minor\n"),
+          ],
+          config: const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        // 0.x carets: ^0.13.0 does NOT allow 0.14.0 — the rewrite fires.
+        final releaseA = plan.releases.singleWhere((r) => r.package.name == 'a');
+        expect(releaseA.constraintRewrites['core'], '^0.14.0');
+        expect(
+          releaseA.changelogEntries.join('\n'),
+          contains('Updated `core` dependency constraint to `^0.14.0`.'),
+        );
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
     test('applyPlan writes private dependent constraint rewrites by path',
         () async {
       final root = buildFixtureRepo(const {
