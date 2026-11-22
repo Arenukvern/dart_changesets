@@ -24,6 +24,19 @@ final class AppliedTrain {
   final String trainsFilePath;
 }
 
+
+/// Returns [path] relative to [root] when it lives under it, otherwise
+/// unchanged. The pending-train artifact is committed, so machine-absolute
+/// paths must not leak into it.
+String _relativeIfUnder(String path, String root) {
+  final separator = Platform.pathSeparator;
+  final normalizedRoot =
+      root.endsWith(separator) ? root : '$root$separator';
+  return path.startsWith(normalizedRoot)
+      ? path.substring(normalizedRoot.length)
+      : path;
+}
+
 const pendingTrainFileName = '.pending-train.json';
 
 /// Applies a [plan] to the working tree: bumps pubspec versions, rewrites
@@ -145,7 +158,13 @@ AppliedTrain applyPlan({
           release.package.name,
           release.newVersion.canonicalizedVersion,
         ),
-        'directory': release.package.directory,
+        // Relative to the repo root: the artifact is committed, and an
+        // absolute path would leak the assembling machine's layout
+        // (observed as /home/runner/work/... in consumer repos).
+        'directory': _relativeIfUnder(
+          release.package.directory,
+          repoRoot ?? Directory(changesetsDir).parent.path,
+        ),
       },
   ]);
   File(trainsPath).writeAsStringSync('$trainsJson\n');
