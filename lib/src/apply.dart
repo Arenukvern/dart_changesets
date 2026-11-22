@@ -237,7 +237,12 @@ String bumpVersionFileContent({
 }
 
 /// Prepends a release section to changelog content, under a leading `#`
-/// header when present.
+/// header when present. Top-of-file HTML comment banners (e.g.
+/// `<!-- markdownlint-disable … -->`) are treated as part of the header
+/// region and stay ABOVE the inserted section — consumers keep them in the
+/// first lines on purpose (oka's markdownlint gate requires the banner in
+/// the first 5 lines; a naive header-then-insert pushed it to line 9 and
+/// failed the train's contracts job, 2026-11-22).
 String prependChangelog(
   String existing, {
   required String version,
@@ -254,10 +259,16 @@ String prependChangelog(
   }
   final lines = existing.split('\n');
   if (lines.first.startsWith('# ')) {
-    // Insert after the header (and any immediately following blank lines).
+    // Insert after the header, blank lines, and any leading comment
+    // banners — the newest section still reads first among versions.
     var insertAt = 1;
-    while (insertAt < lines.length && lines[insertAt].trim().isEmpty) {
-      insertAt++;
+    while (insertAt < lines.length) {
+      final line = lines[insertAt].trim();
+      if (line.isEmpty || line.startsWith('<!--')) {
+        insertAt++;
+        continue;
+      }
+      break;
     }
     final head = lines.sublist(0, insertAt).join('\n');
     final tail = lines.sublist(insertAt).join('\n');

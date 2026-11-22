@@ -396,5 +396,22 @@ void main() {
       );
       expect(updated, contains('## 0.9.0'));
     });
+
+    test('changelog keeps a top-of-file comment banner above the section',
+        () {
+      const existing =
+          '# Changelog\n\n<!-- markdownlint-disable MD052 -->\n\n## 0.9.0\n\n- old\n';
+      final updated = prependChangelog(
+        existing,
+        version: '0.10.0',
+        bumpType: BumpType.patch,
+        entries: const ['Fix.'],
+      );
+      // The banner stays within the first 5 lines (oka's markdownlint gate).
+      expect(updated.split('\n').take(5).join('\n'),
+          contains('markdownlint-disable'));
+      // And the new section still precedes the old one.
+      expect(updated.indexOf('## 0.10.0'), lessThan(updated.indexOf('## 0.9.0')));
+    });
   });
 }
