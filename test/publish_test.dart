@@ -323,6 +323,40 @@ void main() {
       }
     });
 
+    test('skip-dependency-gate warns and publishes as-is past unsatisfied floors',
+        () async {
+      final root = buildFixtureRepo(const {
+        'a': FixturePackage(
+          version: '1.0.0',
+          dependencies: {'b': '^2.0.0'},
+        ),
+        'b': FixturePackage(version: '1.0.0'),
+      });
+      File('${root.path}/pkgs/a/CHANGELOG.md').writeAsStringSync('## 1.0.0\n\n- x\n');
+      try {
+        final graph = await loadGraph(root.path);
+        final code = await publishTag(
+          root.path,
+          config: const ChangesetsConfig(),
+          graph: graph,
+          tag: 'a-v1.0.0',
+          execute: false,
+          skipExisting: true,
+          pubDevClient: FakePubDevClient(const {
+            'a': ['0.9.0'],
+            'b': ['1.0.0'],
+          }),
+          skipDependencyGate: true,
+        );
+        // Never 66: the gate is skipped, the flow proceeds into the strict
+        // dry-run (which fails in the fixture environment — same seam as the
+        // heading-acceptance test).
+        expect(code, isNot(publishExitDependencyTimeout));
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
     test('expired budget fails with the dependency-timeout exit code', () async {
       final root = buildFixtureRepo(const {
         'a': FixturePackage(

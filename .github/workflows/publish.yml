@@ -70,6 +70,14 @@ on:
         required: false
         type: string
         default: '15'
+      skip-dependency-gate:
+        description: >
+          Publish as-is without the dependency gate (warning logged; pub.dev
+          upload validation remains the arbiter). For recovery flows that
+          intentionally publish against floors that are not visible yet.
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   publish:
@@ -117,8 +125,10 @@ jobs:
         run: |
           execute_flag=""
           if [ "${{ inputs.execute }}" = "true" ]; then execute_flag="--execute"; fi
+          gate_flag=""
+          if [ "${{ inputs.skip-dependency-gate }}" = "true" ]; then gate_flag="--skip-dependency-gate"; fi
           dart_changesets publish-tag \
-            --tag "${{ inputs.tag }}" $execute_flag --skip-existing \
+            --tag "${{ inputs.tag }}" $execute_flag --skip-existing $gate_flag \
             --dependency-wait-minutes "${{ inputs.dependency-wait-minutes }}"
 
       # Fires only for the product package's tag and only after the publish
