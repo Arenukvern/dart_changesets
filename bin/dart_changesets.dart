@@ -58,6 +58,11 @@ Future<void> main(List<String> arguments) async {
           'dependency-wait-minutes',
           defaultsTo: '15',
           help: 'How long to wait for same-train dependency floors to land on pub.dev before failing.',
+        )
+        ..addFlag(
+          'skip-dependency-gate',
+          defaultsTo: false,
+          help: 'Publish as-is without the dependency gate; pub.dev upload validation remains the arbiter.',
         ),
     );
 
@@ -533,6 +538,7 @@ Future<int> runPublishTag(
     execute: args['execute'] as bool,
     skipExisting: args['skip-existing'] as bool,
     dependencyWait: Duration(minutes: waitMinutes),
+    skipDependencyGate: args['skip-dependency-gate'] as bool,
     pubDevClient: HttpPubDevClient(),
   );
 }

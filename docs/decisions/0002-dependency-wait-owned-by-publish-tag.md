@@ -36,6 +36,9 @@ fix that could not generalize.
    skip-existing keeps completed packages untouched.
 4. No consumer-side waiter. Convergence is engine behavior, uniform for every
    consumer; consumers tune it with one input instead of copying scripts.
+   A full escape hatch exists for recovery flows — `skip-dependency-gate`
+   (CLI flag / workflow input) publishes as-is past invisible floors, with a
+   warning; pub.dev's upload validation remains the final arbiter.
 
 ## Consequences
 

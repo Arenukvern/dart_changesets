@@ -35,6 +35,7 @@ Future<int> publishTag(
   Duration dependencyWait = const Duration(minutes: 15),
   Duration dependencyPoll = const Duration(seconds: 10),
   Duration visibilityWait = const Duration(seconds: 300),
+  bool skipDependencyGate = false,
 }) async {
   final parsed = config.parseTag(tag.trim());
   if (parsed == null) {
@@ -145,49 +146,63 @@ pub.dev cannot automate a package's first release:
     unsatisfied[entry.key] = VersionConstraint.parse(entry.value.constraint!);
   }
   if (unsatisfied.isNotEmpty) {
-    final deadline = DateTime.now().add(dependencyWait);
-    final pending = Map.of(unsatisfied);
-    // Progress per poll round: a train wait can run for many minutes while a
-    // build-heavy sibling lands, and a silent CI job looks hung.
-    while (DateTime.now().isBefore(deadline) && pending.isNotEmpty) {
-      for (final name in pending.keys.toList()) {
-        final visible = await _visibleVersions(pubDevClient, name);
-        if (visible == null) continue;
-        final constraint = pending[name]!;
-        final satisfied = visible.any((raw) {
-          try {
-            return constraint.allows(Version.parse(raw));
-          } on FormatException {
-            return false;
-          }
-        });
-        if (satisfied) {
-          print(
-            'OK: $name satisfies ${constraint.toString()}; '
-            '${pending.length - 1} dependency(ies) still pending.',
-          );
-          pending.remove(name);
-        }
-      }
-      if (pending.isEmpty) break;
-      final elapsed =
-          dependencyWait - deadline.difference(DateTime.now());
-      print(
-        'waiting for pub.dev: ${pending.keys.join(', ')} '
-        '(${elapsed.inSeconds}s/${dependencyWait.inSeconds}s budget)',
+    if (skipDependencyGate) {
+      // Publish as-is: warn, skip the wait, let pub.dev's upload validation
+      // decide. It rejects constraints no published version satisfies, so
+      // this trades a clear local failure for attempting the upload anyway —
+      // for recovery flows that intentionally publish against stale floors.
+      stderr.writeln(
+        'WARN: dependency floors not visible on pub.dev '
+        '(${unsatisfied.keys.join(', ')}) — skipping the dependency gate '
+        '(skip-dependency-gate); pub.dev upload validation remains the '
+        'arbiter and may reject this upload.',
       );
-      await Future<void>.delayed(dependencyPoll);
-    }
-    if (pending.isNotEmpty) {
-      stderr.writeln('''
+    } else {
+      final deadline = DateTime.now().add(dependencyWait);
+      final pending = Map.of(unsatisfied);
+      // Progress per poll round: a train wait can run for many minutes while
+      // a build-heavy sibling lands, and a silent CI job looks hung.
+      while (DateTime.now().isBefore(deadline) && pending.isNotEmpty) {
+        for (final name in pending.keys.toList()) {
+          final visible = await _visibleVersions(pubDevClient, name);
+          if (visible == null) continue;
+          final constraint = pending[name]!;
+          final satisfied = visible.any((raw) {
+            try {
+              return constraint.allows(Version.parse(raw));
+            } on FormatException {
+              return false;
+            }
+          });
+          if (satisfied) {
+            print(
+              'OK: $name satisfies ${constraint.toString()}; '
+              '${pending.length - 1} dependency(ies) still pending.',
+            );
+            pending.remove(name);
+          }
+        }
+        if (pending.isEmpty) break;
+        final elapsed =
+            dependencyWait - deadline.difference(DateTime.now());
+        print(
+          'waiting for pub.dev: ${pending.keys.join(', ')} '
+          '(${elapsed.inSeconds}s/${dependencyWait.inSeconds}s budget)',
+        );
+        await Future<void>.delayed(dependencyPoll);
+      }
+      if (pending.isNotEmpty) {
+        stderr.writeln('''
 FAIL: pub.dev did not expose versions of ${pending.keys.toList()}
       satisfying this package's constraints within
       ${dependencyWait.inSeconds}s. An upstream release train is still
       landing (a build-heavy sibling can take several minutes to resolve,
       dry-run, upload, and become visible). Re-dispatch this publish
       (workflow_dispatch with the tag, execute checked) once the sibling
-      landed — skip-existing keeps completed packages untouched.''');
-      return publishExitDependencyTimeout;
+      landed — skip-existing keeps completed packages untouched. To
+      attempt the publish anyway, pass --skip-dependency-gate.''');
+        return publishExitDependencyTimeout;
+      }
     }
   }
 
