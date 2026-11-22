@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.3.0
+
+### Minor Changes
+
+- **Changelog comment banners stay above the new version section.**
+  `prependChangelog` now treats top-of-file HTML comments (e.g.
+  `<!-- markdownlint-disable … -->`) as part of the header region instead
+  of pushing them below the inserted section — consumers keep such banners
+  in the first lines on purpose (oka's markdownlint gate requires the
+  banner within the first 5 lines; the naive header-insert moved it to
+  line 9 and failed the train's contracts job).
+- **Declared dependents keep their constraint rewrites regardless of
+  planning order.** The plan queue is alphabetical, so a declared dependent
+  whose name sorts before its dependency (`oka_app_gallery` before
+  `oka_core`) was planned BEFORE the dependency's new version existed — its
+  constraint rewrite landed in the never-consumed pending map and the
+  version PR shipped a graph that cannot resolve. Rewrites now merge into
+  an already-planned release in place.
+- Release-train robustness, four production gaps surfaced by the oka
+  2026-11-22 release cut:
+  
+  - **Merge-commit merges now release.** Detect mode recognized only the
+    squash message prefix ("chore: version packages"); a merge-commit merge
+    of the version PR no-op'd and the train stalled until tags were pushed
+    by hand. The action now also identifies the merge by the PR itself
+    (`gh pr view` state/mergeCommit == HEAD).
+  - **Version-suffixed changelog headings accepted.** `publish-tag` accepts
+    a `##` heading that STARTS with the exact version (`## 1.2.3
+    (2026-11-22)` counts; `## 1.2.31` does not) and names the headings
+    found when the entry is missing, so hand-tended changelogs stop failing
+    the publish gate.
+  - **Pre-bump drift guard.** The version command refuses to assemble a
+    train when a package's pubspec is ahead of its newest release tag
+    (pre-bumped pubspec or unpushed tags) instead of double-bumping — the
+    pubspec current version is the bump BASE.
+  - **Workspace-root constraint cascade.** The workspace ROOT joins the
+    graph as a private node (never releases), so root-level constraints on
+    members cascade with the train instead of drifting stale.
 ## 0.2.0
 
 ### Minor Changes
@@ -40,5 +78,6 @@
   publish train, composite GitHub Action, and reusable publish workflow.
 - Extracted from `pkgs/dart_changesets` in `xsoulspace/dart_flutter_packages`
   (ADR 0073 there).
+
 
 
