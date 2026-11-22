@@ -274,6 +274,21 @@ Future<int> runVersion(
     }
     return 1;
   }
+  // Pubspec current version is the bump BASE — assembling on top of a
+  // pre-bumped or untagged train double-bumps. Refuse loudly instead.
+  final drift = await preReleaseDrift(
+    repoRoot: repoRoot,
+    plan: plan,
+    config: config,
+  );
+  if (drift.isNotEmpty) {
+    stderr.writeln('FAIL: release drift detected — refusing to assemble a '
+        'train on top of it:');
+    for (final line in drift) {
+      stderr.writeln('  - $line');
+    }
+    return 65;
+  }
   final applied = applyPlan(
     plan: plan,
     consumedChangesetPaths: changesets.map((c) => c.path).toList(),

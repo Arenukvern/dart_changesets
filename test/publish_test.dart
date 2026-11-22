@@ -92,6 +92,61 @@ void main() {
     }
   });
 
+  test('publish-tag accepts a version heading with a suffix', () async {
+    final root = buildFixtureRepo(const {
+      'a': FixturePackage(version: '1.0.0'),
+    });
+    File('${root.path}/pkgs/a/CHANGELOG.md').writeAsStringSync(
+      '## 1.0.0 (2026-11-22)\n\n- x\n',
+    );
+    try {
+      final graph = await loadGraph(root.path);
+      final code = await publishTag(
+        root.path,
+        config: const ChangesetsConfig(),
+        graph: graph,
+        tag: 'a-v1.0.0',
+        execute: false,
+        skipExisting: true,
+        pubDevClient: FakePubDevClient(const {
+          'a': ['0.1.0'],
+        }),
+      );
+      // Past the changelog gate; the fixture cannot pass a real strict
+      // dry-run, so any non-usage code proves the heading was accepted.
+      expect(code, isNot(publishExitUsage));
+    } finally {
+      teardownRepo(root);
+    }
+  });
+
+  test('publish-tag does not match a longer version heading', () async {
+    final root = buildFixtureRepo(const {
+      'a': FixturePackage(version: '1.0.0'),
+    });
+    // The heading names 1.0.01, not 1.0.0 — the boundary must not match.
+    File('${root.path}/pkgs/a/CHANGELOG.md').writeAsStringSync(
+      '## 1.0.01\n\n- x\n',
+    );
+    try {
+      final graph = await loadGraph(root.path);
+      final code = await publishTag(
+        root.path,
+        config: const ChangesetsConfig(),
+        graph: graph,
+        tag: 'a-v1.0.0',
+        execute: false,
+        skipExisting: true,
+        pubDevClient: FakePubDevClient(const {
+          'a': ['0.1.0'],
+        }),
+      );
+      expect(code, publishExitUsage);
+    } finally {
+      teardownRepo(root);
+    }
+  });
+
   test('publish-tag skips when pub.dev already has the version', () async {
     final root = buildFixtureRepo(const {
       'a': FixturePackage(version: '1.0.0'),

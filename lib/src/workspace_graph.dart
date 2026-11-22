@@ -170,6 +170,40 @@ final class WorkspaceGraph {
           }
         }
         discovered = true;
+        // The workspace ROOT itself can depend on members (an app or CLI
+        // living at the repo root, e.g. a workspace app pinning its
+        // packages). It is never a release candidate, but its constraints
+        // must cascade with the train — skipping it left root constraints
+        // stale on real trains (oka_workspace, 2026-11-22). A private root
+        // goes through the constraint-only rewrite path, exactly like other
+        // publish_to: none dependents.
+        if (rootDoc is YamlMap) {
+          final rootName = rootDoc['name']?.toString();
+          if (rootName != null && !found.containsKey(rootName)) {
+            // A root without a valid version still joins the graph (as
+            // 0.0.0): it can never release, only cascade constraints.
+            var rootVersion = Version(0, 0, 0);
+            try {
+              rootVersion = Version.parse(
+                rootDoc['version']?.toString() ?? '',
+              );
+            } on FormatException {
+              rootVersion = Version(0, 0, 0);
+            }
+            found[rootName] = WorkspacePackage(
+              name: rootName,
+              version: rootVersion,
+              pubspecPath: rootPubspec.path,
+              pubspecContent: rootPubspec.readAsStringSync(),
+              publishable: false,
+              dependencies: _readDependencies(rootDoc['dependencies']),
+              devDependencies: _readDependencies(rootDoc['dev_dependencies']),
+              sdkConstraint: rootDoc['environment'] is YamlMap
+                  ? (rootDoc['environment'] as YamlMap)['sdk']?.toString()
+                  : null,
+            );
+          }
+        }
       }
     }
     if (!discovered) {

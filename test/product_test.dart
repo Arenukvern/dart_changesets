@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:pub_semver/pub_semver.dart';
 import 'package:test/test.dart';
 
 import 'package:dart_changesets/src/apply.dart';
@@ -8,6 +9,7 @@ import 'package:dart_changesets/src/bump.dart';
 import 'package:dart_changesets/src/changeset.dart';
 import 'package:dart_changesets/src/config.dart';
 import 'package:dart_changesets/src/product.dart';
+import 'package:dart_changesets/src/workspace_graph.dart';
 
 import 'fixtures.dart';
 
@@ -435,6 +437,106 @@ version_files:
         );
       } finally {
         teardownRepo(root);
+      }
+    });
+  });
+
+  group('preReleaseDrift', () {
+    // A throwaway git repo holding package `a` at [version] with real
+    // release tags, so the guard compares against actual tag state.
+    Future<Directory> gitFixtureRepo(
+      String version, {
+      List<String> tags = const <String>[],
+    }) async {
+      final root =
+          buildFixtureRepo({'a': FixturePackage(version: version)});
+      for (final command in <List<String>>[
+        <String>['init', '--quiet'],
+        <String>['config', 'user.email', 'test@example.dev'],
+        <String>['config', 'user.name', 'test'],
+        // Tags need a HEAD to attach to.
+        <String>['commit', '--allow-empty', '--quiet', '-m', 'init'],
+        for (final tag in tags) <String>['tag', tag],
+      ]) {
+        await Process.run('git', command, workingDirectory: root.path);
+      }
+      return root;
+    }
+
+    PlannedRelease planned(WorkspacePackage pkg, String version) =>
+        PlannedRelease(
+          package: pkg,
+          newVersion: Version.parse(version),
+          bumpType: BumpType.minor,
+          changelogEntries: const <String>[],
+          isDependentBump: false,
+          constraintRewrites: const <String, String>{},
+        );
+
+    Future<List<String>> drift(Directory root, WorkspaceGraph graph) =>
+        preReleaseDrift(
+          repoRoot: root.path,
+          plan: ReleasePlan(
+            releases: [planned(graph.packages['a']!, '1.3.0')],
+            privateConstraintRewrites: const {},
+            errors: const [],
+          ),
+          config: const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+
+    test('flags a pubspec ahead of its newest release tag', () async {
+      final root = await gitFixtureRepo('1.1.0', tags: <String>['a-v1.0.0']);
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, hasLength(1));
+        expect(problems.single, contains('newest release tag (1.0.0)'));
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('passes when the pubspec matches the newest tag', () async {
+      final root = await gitFixtureRepo('1.2.3', tags: <String>['a-v1.2.3']);
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('first release (no tags) passes', () async {
+      final root = Directory.systemTemp.createTempSync('dc_drift_fresh_');
+      Directory('${root.path}/pkgs/new').createSync(recursive: true);
+      File('${root.path}/pkgs/new/pubspec.yaml').writeAsStringSync(
+        'name: new\nversion: 0.1.0\nenvironment:\n  sdk: ^3.14.0\n',
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final plan = ReleasePlan(
+          releases: [planned(graph.packages['new']!, '0.2.0')],
+          privateConstraintRewrites: const {},
+          errors: const [],
+        );
+        final problems = await preReleaseDrift(
+          repoRoot: root.path,
+          plan: plan,
+          config: const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        expect(problems, isEmpty);
+      } finally {
+        root.deleteSync(recursive: true);
       }
     });
   });

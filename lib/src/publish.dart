@@ -69,13 +69,25 @@ Future<int> publishTag(
   }
   final changelog = File('${pkg.directory}${Platform.pathSeparator}CHANGELOG.md');
   final changelogText = changelog.existsSync() ? changelog.readAsStringSync() : '';
+  // The heading must START with the exact version — an exact `## 1.2.3`
+  // and an annotated `## 1.2.3 (2026-11-22)` both count, but `## 1.2.31`
+  // does not (the `(?![\d.])` boundary). Version-suffixed headings are the
+  // norm in hand-tended changelogs; requiring the bare heading turned real
+  // trains into manual changelog edits (oka, 2026-11-22).
   final versionHeading = RegExp(
-    r'^##[ \t]+' + RegExp.escape(versionRaw) + r'\s*$',
+    r'^##[ \t]+' + RegExp.escape(versionRaw) + r'(?![\d.])[ \t]*.*$',
     multiLine: true,
   );
   if (!versionHeading.hasMatch(changelogText)) {
+    final headings = RegExp(r'^##[ \t]+.*$', multiLine: true)
+        .allMatches(changelogText)
+        .map((match) => match.group(0)!.trim())
+        .toList();
     stderr.writeln(
-      'FAIL: $packageName/CHANGELOG.md has no entry for $versionRaw.',
+      'FAIL: $packageName/CHANGELOG.md has no entry for $versionRaw — '
+      'expected a "##" heading that starts with "$versionRaw" '
+      '(e.g. "## $versionRaw"); found: '
+      '${headings.isEmpty ? 'no ## headings' : headings.take(5).join(', ')}.',
     );
     return publishExitUsage;
   }

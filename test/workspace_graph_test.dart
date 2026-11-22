@@ -136,13 +136,16 @@ workspace:
             'ecs_camera_core',
             'tool_cli',
             'root_member',
+            // The workspace root joins the graph as a PRIVATE node so its
+            // constraints cascade without ever releasing.
+            'workspace_root',
           },
         );
+        expect(graph.packages['workspace_root']!.publishable, isFalse);
         expect(graph.packages['alpha']!.publishable, isTrue);
         expect(graph.packages['beta']!.publishable, isFalse);
         expect(graph.packages['root_member']!.publishable, isTrue);
         expect(graph.packages.containsKey('hidden'), isFalse);
-        expect(graph.packages.containsKey('workspace_root'), isFalse);
       } finally {
         teardownRepo(root);
       }

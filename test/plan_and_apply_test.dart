@@ -7,6 +7,7 @@ import 'package:dart_changesets/src/bump.dart';
 import 'package:dart_changesets/src/changeset.dart';
 import 'package:dart_changesets/src/config.dart';
 import 'package:dart_changesets/src/apply.dart';
+import 'package:dart_changesets/src/workspace_graph.dart';
 
 import 'fixtures.dart';
 
@@ -156,6 +157,44 @@ void main() {
         expect(rewrites[key]?['core'], '^2.0.0');
       } finally {
         teardownRepo(root);
+      }
+    });
+
+    test('workspace root joins the graph as a private dependent', () async {
+      final root = Directory.systemTemp.createTempSync('dcg_root_cascade_');
+      Directory('${root.path}/pkgs/core').createSync(recursive: true);
+      File('${root.path}/pkgs/core/pubspec.yaml').writeAsStringSync(
+        'name: core\nversion: 1.0.0\nenvironment:\n  sdk: ^3.14.0\n',
+      );
+      // The root pubspec is a workspace app depending on a member — not a
+      // release candidate, but its constraint must cascade.
+      File('${root.path}/pubspec.yaml').writeAsStringSync(
+        'name: workspace_app\nversion: 2.0.0\nenvironment:\n'
+        '  sdk: ^3.14.0\nworkspace:\n  - pkgs/*\ndependencies:\n'
+        "  core: '^1.0.0'\n",
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        expect(graph.packages.containsKey('workspace_app'), isTrue);
+        expect(graph.packages['workspace_app']!.publishable, isFalse);
+        final plan = computePlan(
+          graph: graph,
+          changesets: [
+            writeChangeset(root, 'one', "'core': major\n"),
+          ],
+          config: const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        // The root never releases.
+        expect(plan.releases.map((r) => r.package.name), ['core']);
+        final rewrites = plan.privateConstraintRewrites;
+        final key = rewrites.keys
+            .singleWhere((k) => k.endsWith('pubspec.yaml') && !k.contains('/pkgs/'));
+        expect(rewrites[key]?['core'], '^2.0.0');
+      } finally {
+        root.deleteSync(recursive: true);
       }
     });
 

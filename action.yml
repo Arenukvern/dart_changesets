@@ -130,16 +130,31 @@ runs:
       env:
         COMMIT_PREFIX: ${{ inputs.commit }}
         INPUT_PUBLISH: ${{ inputs.publish }}
+        BRANCH: ${{ inputs.branch }}
+        GH_TOKEN: ${{ inputs.token || github.token }}
       run: |
         set -euo pipefail
         # Pending intent files (README.md and dot-files excluded by the engine).
         pending=$(find .changesets -maxdepth 1 -name '*.md' ! -name 'README.md' ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
         train=".changesets/.pending-train.json"
         head_msg="$(git log -1 --pretty=%s)"
+        head_sha="$(git rev-parse HEAD)"
+
+        # The commit-message prefix only matches SQUASH merges ("chore:
+        # version packages"). A merge-COMMIT merge carries the PR's merge
+        # message instead, so identify it by the PR itself: this HEAD is the
+        # merge commit of the version PR (oka, 2026-11-22 — a merge-commit
+        # merge no-op'd here and the train stalled until tags were pushed
+        # by hand).
+        pr_merge_sha=""
+        if [ -f "$train" ]; then
+          pr_merge_sha="$(gh pr view "$BRANCH" --json state,mergeCommit \
+            --jq 'select(.state == "MERGED") | .mergeCommit.oid' 2>/dev/null || true)"
+        fi
 
         if [ "$pending" -gt 0 ]; then
           echo "result=assemble" >> "$GITHUB_OUTPUT"
-        elif [ "$INPUT_PUBLISH" = "true" ] && [ -f "$train" ] && [[ "$head_msg" == "$COMMIT_PREFIX"* ]]; then
+        elif [ "$INPUT_PUBLISH" = "true" ] && [ -f "$train" ] && { [[ "$head_msg" == "$COMMIT_PREFIX"* ]] || { [ -n "$pr_merge_sha" ] && [ "$pr_merge_sha" = "$head_sha" ]; }; }; then
           echo "result=release" >> "$GITHUB_OUTPUT"
         else
           echo "result=none" >> "$GITHUB_OUTPUT"
@@ -212,6 +227,9 @@ runs:
       run: |
         set -euo pipefail
         merge_sha="$(git rev-parse HEAD)"
+        # Tags are pushed ONE PER ITERATION, never batched: GitHub fires
+        # push-triggered workflows for at most ~3 refs of a single push, so
+        # a batched push would silently drop publish legs (oka, 2026-11-22).
         for tag in $(dart_changesets tags --plain); do
           echo "== $tag =="
           if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then

@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:pub_semver/pub_semver.dart';
+
 import 'apply.dart';
+import 'bump.dart';
 import 'config.dart';
 
 /// The product release for a train: the configured product package's
@@ -66,17 +69,19 @@ String? productTagForPublishTag({
 }
 
 /// Extracts one version section from a changelog for use as GitHub release
-/// notes. Handles the engine's `## X.Y.Z` headings and the legacy
-/// `## [X.Y.Z] - date` shape. Returns the section body WITHOUT the version
-/// heading (subsection headings and bullets kept), or `null` when the
-/// changelog has no entry for [version].
+/// notes. Handles the engine's `## X.Y.Z` headings, the legacy
+/// `## [X.Y.Z] - date` shape, and version-suffixed headings like
+/// `## X.Y.Z (2026-11-22)` — anything that STARTS with the exact version
+/// (`(?![\d.])` keeps `## X.Y.Z1` from matching). Returns the section body
+/// WITHOUT the version heading (subsection headings and bullets kept), or
+/// `null` when the changelog has no entry for [version].
 String? extractReleaseNotes({
   required String changelog,
   required String version,
 }) {
   final lines = const LineSplitter().convert(changelog);
   final heading = RegExp(
-    r'^##\s+\[?' + RegExp.escape(version) + r'\]?\s*(\-.*)?$',
+    r'^##\s+\[?' + RegExp.escape(version) + r'\]?(?![\d.])[ \t]*.*$',
   );
   var start = -1;
   for (var i = 0; i < lines.length; i++) {
@@ -94,4 +99,63 @@ String? extractReleaseNotes({
     }
   }
   return lines.sublist(start, end).join('\n').trim();
+}
+
+/// Drift guard for a train about to be applied: a package whose pubspec
+/// version is AHEAD of its newest release tag means either the previous
+/// train's tags were never pushed or the pubspec was hand-bumped — applying
+/// a new train on top would double-bump (observed on oka 2026-11-22: the
+/// version PR rebumped pre-bumped pubspecs because the pubspec current
+/// version is the bump BASE). Returns one problem line per drifted package;
+/// empty means clean. Best-effort: a git failure returns no findings rather
+/// than blocking trains on environments without tags.
+Future<List<String>> preReleaseDrift({
+  required String repoRoot,
+  required ReleasePlan plan,
+  required ChangesetsConfig config,
+}) async {
+  if (plan.isEmpty) return const <String>[];
+  final run = await Process.run(
+    'git',
+    const <String>['tag', '--list'],
+    workingDirectory: repoRoot,
+  );
+  // Best-effort: no tags available (fresh clone without tags, no git) —
+  // drift cannot be established, so do not block the train.
+  if (run.exitCode != 0) return const <String>[];
+  final allTags = (run.stdout as String)
+      .split('\n')
+      .map((raw) => raw.trim())
+      .where((tag) => tag.isNotEmpty)
+      .toList();
+  final problems = <String>[];
+  for (final release in plan.releases) {
+    final name = release.package.name;
+    final tagVersions = <Version>[];
+    for (final tag in allTags) {
+      final parsed = config.parseTag(tag);
+      if (parsed == null) continue;
+      final (package, versionRaw) = parsed;
+      if (package != name) continue;
+      try {
+        tagVersions.add(Version.parse(versionRaw));
+      } on FormatException {
+        continue;
+      }
+    }
+    // First release — no tags to drift against.
+    if (tagVersions.isEmpty) continue;
+    tagVersions.sort();
+    final latest = tagVersions.last;
+    if (release.package.version > latest) {
+      problems.add(
+        '$name: pubspec ${release.package.version} is ahead of the newest '
+        'release tag ($latest). Either the previous train\'s tags were '
+        'never pushed, or the pubspec was pre-bumped — assembling this '
+        'train would double-bump. Push the missing tags or restore the '
+        'pubspec to the released version first.',
+      );
+    }
+  }
+  return problems;
 }
