@@ -87,14 +87,20 @@ jobs:
     timeout-minutes: 30
     steps:
       # Checks out the CALLER repository when invoked via workflow_call.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dart-lang/setup-dart@v1
 
       - name: Install engine
+        env:
+          ENGINE_REF: ${{ inputs.engine-ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
-          ref="${{ inputs.engine-ref }}"
-          if [ -z "$ref" ]; then ref="${GITHUB_ACTION_REF:-main}"; fi
+          set -euo pipefail
+          ref="${ENGINE_REF}"
+          if [ -z "$ref" ]; then
+            ref="${WORKFLOW_SHA:-${GITHUB_ACTION_REF:-main}}"
+          fi
           dart pub global activate --source git \
             "https://github.com/${GITHUB_ACTION_REPOSITORY:-Arenukvern/dart_changesets}.git" \
             --git-ref "$ref"
@@ -144,6 +150,10 @@ jobs:
             echo "not the product tag; nothing to dispatch"
             exit 0
           fi
+          dispatch_ref="${{ github.ref_name }}"
+          if [ -n "$ptag" ] && git rev-parse -q --verify "refs/tags/$ptag" >/dev/null 2>&1; then
+            dispatch_ref="$ptag"
+          fi
           gh workflow run "${{ inputs.product-dispatch-workflow }}" \
-            --ref "${{ github.ref_name }}" \
+            --ref "$dispatch_ref" \
             -f "${{ inputs.product-dispatch-input }}=$ptag"

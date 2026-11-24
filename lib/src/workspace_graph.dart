@@ -207,20 +207,40 @@ final class WorkspaceGraph {
       }
     }
     if (!discovered) {
-      if (!dir.existsSync() && !config.rootPackage) {
-        throw StateError(
-          'packages directory not found: ${dir.path} '
-          '(configure packages_dir in changesets.yaml, or set root_package: '
-          'true for single-package repositories)',
-        );
+      var packagesRoot = dir;
+      if (!packagesRoot.existsSync()) {
+        if (config.packagesDir == 'pkgs') {
+          final packagesAlt = Directory(p.join(repoRoot, 'packages'));
+          if (packagesAlt.existsSync()) {
+            packagesRoot = packagesAlt;
+          }
+        }
       }
-      if (dir.existsSync()) {
-        for (final entry in dir.listSync()) {
+      if (packagesRoot.existsSync()) {
+        for (final entry in packagesRoot.listSync()) {
           if (entry is! Directory) continue;
           final pubspecFile = File(p.join(entry.path, 'pubspec.yaml'));
           if (!pubspecFile.existsSync()) continue;
           addPackage(pubspecFile);
         }
+      } else if (!config.rootPackage && found.isEmpty && rootPubspec.existsSync()) {
+        final rootDoc = loadYamlNode(rootPubspec.readAsStringSync());
+        if (rootDoc is YamlMap &&
+            rootDoc['name'] != null &&
+            rootDoc['version'] != null) {
+          final publishTo = rootDoc['publish_to'];
+          if (publishTo == null || publishTo.toString() != 'none') {
+            addPackage(rootPubspec);
+          }
+        }
+      }
+      if (found.isEmpty && !config.rootPackage) {
+        throw StateError(
+          'no packages found under ${dir.path}'
+          '${packagesRoot.path != dir.path ? ' or ${packagesRoot.path}' : ''}. '
+          'Configure packages_dir, set root_package: true for a single-package '
+          'repository, or add a pub workspace declaration in pubspec.yaml.',
+        );
       }
     }
     if (config.rootPackage && rootPubspec.existsSync()) {

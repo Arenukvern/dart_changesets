@@ -4,3 +4,6 @@ packages_dir: pkgs
 root_package: true
 dependent_bump: patch
 tag_format: '{package}-v{version}'
+product_tag:
+  package: dart_changesets
+  format: 'v{version}'

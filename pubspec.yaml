@@ -1,8 +1,7 @@
 name: dart_changesets
 description: >-
-  Changesets-style release engine for Dart monorepos: intent files,
-  graph-aware version PRs, and per-tag pub.dev publish trains. Also a
-  GitHub Action (action.yml) so one workflow wires the whole flow.
+  Changesets-style release engine for Dart: intent files, version PRs,
+  per-tag pub.dev publish trains, and a composite GitHub Action.
 version: 0.3.0
 homepage: https://github.com/Arenukvern/dart_changesets
 repository: https://github.com/Arenukvern/dart_changesets
