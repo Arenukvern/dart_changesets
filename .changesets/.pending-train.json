@@ -1,8 +1,8 @@
 [
   {
     "package": "dart_changesets",
-    "version": "0.3.0",
-    "tag": "dart_changesets-v0.3.0",
+    "version": "1.0.0",
+    "tag": "dart_changesets-v1.0.0",
     "directory": "."
   }
 ]

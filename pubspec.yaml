@@ -2,7 +2,7 @@ name: dart_changesets
 description: >-
   Changesets-style release engine for Dart: intent files, version PRs,
   per-tag pub.dev publish trains, and a composite GitHub Action.
-version: 0.3.0
+version: 1.0.0
 homepage: https://github.com/Arenukvern/dart_changesets
 repository: https://github.com/Arenukvern/dart_changesets
 issue_tracker: https://github.com/Arenukvern/dart_changesets/issues

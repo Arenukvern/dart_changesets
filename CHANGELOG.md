@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0
+
+### Major Changes
+
+- Ship 1.0.0: OSS-ready self-release and consumer fixes (PR #13) — release-before-assemble, GITHUB_TOKEN publish path, job.workflow_* engine install, optional v1 pin, drift guard, and docs/CLI.
+- Dependency wait on publish-tag raised to 15 minutes by default (was 240s), made configurable via a new `--dependency-wait-minutes` CLI flag and a `dependency-wait-minutes` reusable-workflow input, and the poll now logs progress each round (which floors are still pending, elapsed/budget) instead of sitting silent. Root evidence — oka 0.12 train, 2026-11-22: four consecutive `oka_supervisor` publish failures because a build-heavy sibling (`oka_core`) took longer than the old 4-minute budget to resolve, dry-run, upload, and become visible; each run died with exit 66 and needed a manual re-dispatch.
+- Fix self-release mode detection, optional PAT + pub.dev workflow_dispatch publishes, pin @v1 on release, consumer templates and docs, and CLI help/version ergonomics.
+- `publish-tag` gains `--skip-dependency-gate` (and the reusable workflow a `skip-dependency-gate` input): publish as-is without the dependency-floor gate — a warning names the invisible floors and pub.dev's upload validation remains the arbiter. For recovery flows that intentionally publish against floors that are not visible yet, instead of burning the whole dependency-wait budget on a floor nothing will ever satisfy.
+
 ## 0.3.0
 
 > **Never published to pub.dev** — the version-PR merged on 2026-11-24, then
@@ -83,6 +92,7 @@
   publish train, composite GitHub Action, and reusable publish workflow.
 - Extracted from `pkgs/dart_changesets` in `xsoulspace/dart_flutter_packages`
   (ADR 0073 there).
+
 
 
 
