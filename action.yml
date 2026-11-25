@@ -220,8 +220,8 @@ runs:
         else
           git checkout -B "$BRANCH"
         fi
-        dart_changesets version
         ahead_warnings="$(dart_changesets pubspec-ahead-warnings 2>/dev/null || true)"
+        dart_changesets version
         if git diff --quiet && git diff --cached --quiet; then
           echo "No file changes after apply — the version branch is current."
         else
@@ -349,7 +349,9 @@ runs:
                 echo "::warning::could not move $MAJOR_REF (stale lease, ref protected, or missing workflows permission on token)"
               fi
             else
-              if ! git push origin "$MAJOR_REF"; then
+              if ! git push origin \
+                "refs/tags/${MAJOR_REF}:refs/tags/${MAJOR_REF}" \
+                --force-with-lease="refs/tags/${MAJOR_REF}:"; then
                 echo "::warning::could not create $MAJOR_REF"
               fi
             fi

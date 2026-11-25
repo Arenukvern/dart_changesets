@@ -314,7 +314,8 @@ the CLI from **`GITHUB_ACTION_PATH`** (the checked-out action tree), not from
 the consumer’s `GITHUB_SHA`.
 
 Reusable `publish.yml` installs from **`job.workflow_sha`** / **`job.workflow_repository`**
-in the called workflow repository (`github.job` is the caller job id — do not use).
+in the called workflow repository (`github.job` is the **current job’s id string**, e.g.
+`publish`, not the caller or workflow ref — do not use for engine install).
 Unavailable on GHES → warning and `main` fallback. Override with `engine-ref`
 when pinning a specific tag. Checkout must use **`fetch-depth: 0`** so release
 mode can read tags and train history.

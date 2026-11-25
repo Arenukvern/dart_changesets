@@ -96,7 +96,10 @@ Future<void> main(List<String> arguments) async {
     exit(0);
   }
   final command = args.command;
-  if (command != null && command['help'] == true) {
+  if (command != null &&
+      command.options.contains('help') &&
+      command.wasParsed('help') &&
+      command['help'] == true) {
     stdout.writeln(parser.commands[command.name]!.usage);
     exit(0);
   }
