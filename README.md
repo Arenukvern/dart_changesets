@@ -1,6 +1,6 @@
 <div align="center">
 
-<!-- Logo: <img src="doc/assets/logo.svg" alt="dart_changesets logo" width="96" /> -->
+<img src="doc/assets/logo.svg" alt="dart_changesets logo" width="96" />
 
 # dart_changesets
 
