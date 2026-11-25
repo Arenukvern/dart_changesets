@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+
+# FAQ Documentation Usage — dart_changesets
+
+**Q: Where is the charter?**
+A: `doc/NORTH_STAR.md` — product outcome and boundaries. Not DESIGN_FAQ or AGENTS.md.
+
+**Q: What is `doc/DESIGN_FAQ.md` for?**
+A: Standing **why** for the release engine (intents, per-tag pub.dev, OIDC without GitHub environments, dependency wait, tags, self-release). Use when changing architecture, invariants, or documenting trade-offs. Link to `doc/decisions/` ADRs for full deliberation.
+
+**Q: What is `doc/DX_FAQ.md` for?**
+A: **How** to develop and consume the engine (setup, intents, CLI, consumer workflows, publish exit codes, troubleshooting). Use when writing client workflows or contributor steps.
+
+**Q: How do FAQs relate to ADRs?**
+A: ADRs record significant decisions (`doc/decisions/`). DESIGN_FAQ compresses everyday **why**; DX_FAQ holds **how**. Do not duplicate ADR prose — link instead.
+
+**Q: How do FAQs relate to README and AGENTS.md?**
+A: README is the consumer manual; AGENTS.md is the agent invariant map. FAQs absorb repeated Q&A so README stays scannable; update FAQs when the same question would otherwise bloat README or AGENTS.
+
+**Q: Which FAQ should I update after a change?**
+A: Architectural or invariant **why** → `doc/DESIGN_FAQ.md` (+ new ADR if strategic). Contributor or consumer **how** → `doc/DX_FAQ.md`. Consumer-facing behavior still belongs in README sections operators read first.
+
+**Q: Must doc changes use `doc/` not `docs/`?**
+A: Yes. Plural `docs/` at package root fails strict `dart pub publish --dry-run`. Never create `docs/` in this repository.
+
+**Q: Should doc-only releases get a changeset?**
+A: Yes when `doc/` ships on pub.dev — add a patch intent under `.changesets/` like other user-visible changes.

@@ -21,10 +21,14 @@ adoption:
 
 stewardship:
   governance:
-    charter: AGENTS.md
+    north_star: doc/NORTH_STAR.md
     adr_dir: doc/decisions
+    faq:
+      design: doc/DESIGN_FAQ.md
+      dx: doc/DX_FAQ.md
   knowledge:
     docs_map: AGENTS.md
+    agent_map: AGENTS.md
     source_policy: required_for_external_claims
   repo_quality:
     contract_spec: steward.yaml
@@ -45,13 +49,14 @@ stewardship:
     # true = ADR-level architecture may use MoE. Not a preflight for ordinary edits.
     moe_required_for_architecture: false
   strategic_alignment:
-    vision_source: AGENTS.md
+    vision_source: doc/NORTH_STAR.md
     success_evidence: required
+    falsifiers: doc/NORTH_STAR.md#falsifiers
   security:
     action_effects: required
     redaction: steward/redaction/v1
   org:
-    owners: AGENTS.md
+    owners: CONTRIBUTING.md
 
 actions: {}
 
