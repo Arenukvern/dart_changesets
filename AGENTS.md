@@ -4,6 +4,16 @@ Single-package repository: the engine AND the released package are the repo
 root. It releases itself through its own action (`.github/workflows/
 release.yml` + `self_publish.yml`) — dogfooding is the acceptance test.
 
+## FAQ documentation
+
+| Question type | File |
+| --- | --- |
+| Why (architecture, invariants, trade-offs) | `doc/DESIGN_FAQ.md` |
+| How (setup, CLI, consumer wiring, troubleshooting) | `doc/DX_FAQ.md` |
+
+After code changes, consult `.cursor/rules/faq_usage.mdc`: update the relevant
+FAQ (or link a new ADR) — do not duplicate long rationale in this file.
+
 ## Validation
 
 ```bash
@@ -34,3 +44,6 @@ dart test
 - `example/consumer-workflows/` — copy-paste consumer templates.
 - `doc/decisions/` — engine ADRs (0001: why the publish path declares no
   GitHub environment).
+- `doc/DESIGN_FAQ.md` / `doc/DX_FAQ.md` — compressed why/how (published on
+  pub.dev under `doc/`).
+- `.cursor/rules/faq_usage.mdc` — when agents should read or update FAQs.

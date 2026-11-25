@@ -23,6 +23,8 @@ stewardship:
   governance:
     charter: AGENTS.md
     adr_dir: doc/decisions
+    design_faq: doc/DESIGN_FAQ.md
+    dx_faq: doc/DX_FAQ.md
   knowledge:
     docs_map: AGENTS.md
     source_policy: required_for_external_claims

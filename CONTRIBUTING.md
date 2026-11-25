@@ -4,8 +4,10 @@ Thank you for your interest in dart_changesets! 🌱
 
 Issues and pull requests live on
 [GitHub](https://github.com/Arenukvern/dart_changesets). For behavior
-questions, start with the [README](README.md) and [AGENTS.md](AGENTS.md)
-(invariants and file map). Security reports go to
+questions, start with the [README](README.md), then [doc/DX_FAQ.md](doc/DX_FAQ.md)
+(how) and [doc/DESIGN_FAQ.md](doc/DESIGN_FAQ.md) (why). Agents read
+[AGENTS.md](AGENTS.md) for invariants and `.cursor/rules/faq_usage.mdc` for
+when to update FAQs. Security reports go to
 [SECURITY.md](SECURITY.md) — never in a public issue.
 
 ## Development setup
@@ -86,8 +88,8 @@ Checklist:
 - [ ] `dart analyze` clean, `dart test` green
 - [ ] Cascade fixtures extended if the engine's version math changed
 - [ ] Intent file added (`.changesets/`) for user-facing changes
-- [ ] Docs updated: README for consumer-facing behavior, AGENTS.md for
-      invariants
+- [ ] Docs updated: README for consumer-facing behavior; DESIGN_FAQ / DX_FAQ
+      when why/how shifts; AGENTS.md for invariants
 - [ ] Attribution comment added when porting logic from the TS original or
       intentcall
 

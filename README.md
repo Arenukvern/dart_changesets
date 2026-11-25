@@ -378,6 +378,12 @@ More detail: [CONTRIBUTING.md](CONTRIBUTING.md#contributor-credit).
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
+## Documentation
+
+- [doc/DESIGN_FAQ.md](doc/DESIGN_FAQ.md) — why the engine is shaped this way (intents, per-tag publish, OIDC, dependency wait)
+- [doc/DX_FAQ.md](doc/DX_FAQ.md) — how to develop, consume, and troubleshoot trains
+- [doc/decisions/](doc/decisions/) — ADRs for cross-cutting decisions
+
 ## Contributing & community
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — setup, validation, conventions, PR checklist
