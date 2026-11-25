@@ -9,72 +9,168 @@ import 'package:dart_changesets/dart_changesets.dart';
 const changesetsDirName = '.changesets';
 const configFileName = 'changesets.yaml';
 
-Future<void> main(List<String> arguments) async {
-  final parser = ArgParser()
+const _commandDescriptions = <String, String>{
+  'add': 'Create a release intent file (interactive or via flags).',
+  'pubspec-ahead-warnings':
+      'List packages whose pubspec version is ahead of the newest release '
+      'tag (advisory; does not block release).',
+  'status': 'Show pending changesets and the planned release train.',
+  'version':
+      'Apply the pending version train (bump pubspecs, CHANGELOGs, train '
+      'artifact).',
+  'doctor': 'Run repository release gates and optional pub.dev census.',
+  'tags': 'List per-package tags from the pending train artifact.',
+  'product-release':
+      'Print product-release metadata for CI (release mode or publish mode '
+      'with --tag).',
+  'release-notes': 'Extract one CHANGELOG section for GitHub release bodies.',
+  'runner': 'Print dart or flutter — the SDK to use when publishing a tag.',
+  'publish-tag':
+      'Preflight or execute pub.dev publish for one per-package release tag.',
+};
+
+ArgParser _subcommandParser(void Function(ArgParser p) configure) {
+  final p = ArgParser();
+  p.addFlag(
+    'help',
+    abbr: 'h',
+    negatable: false,
+    help: 'Print usage for this command.',
+  );
+  configure(p);
+  return p;
+}
+
+ArgParser buildArgParser() {
+  return ArgParser()
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Print this usage.')
     ..addFlag('version', negatable: false, help: 'Print the package version.')
     ..addCommand(
       'add',
-      ArgParser()
-        ..addFlag('help', abbr: 'h', negatable: false, help: 'Usage for add.')
-        ..addOption('package', abbr: 'p', help: 'Package name (non-interactive).')
-        ..addOption('bump', abbr: 'b', help: 'major, minor, or patch.')
-        ..addOption('message', abbr: 'm', help: 'Changelog summary (one line).'),
+      _subcommandParser(
+        (p) => p
+          ..addOption(
+            'package',
+            abbr: 'p',
+            help: 'Package name (non-interactive).',
+          )
+          ..addOption('bump', abbr: 'b', help: 'major, minor, or patch.')
+          ..addOption(
+            'message',
+            abbr: 'm',
+            help: 'Changelog summary (one line).',
+          ),
+      ),
     )
-    ..addCommand('pubspec-ahead-warnings')
-    ..addCommand('status')
+    ..addCommand('pubspec-ahead-warnings', _subcommandParser((_) {}))
+    ..addCommand('status', _subcommandParser((_) {}))
     ..addCommand(
       'version',
-      ArgParser()..addFlag('check', negatable: false, help: 'Exit 1 when a version PR is due; write nothing.'),
+      _subcommandParser(
+        (p) => p.addFlag(
+          'check',
+          negatable: false,
+          help: 'Exit 1 when a version PR is due; write nothing.',
+        ),
+      ),
     )
-    ..addCommand('doctor', ArgParser()
-      ..addFlag('no-network', negatable: false, help: 'Skip the pub.dev presence census.'))
+    ..addCommand(
+      'doctor',
+      _subcommandParser(
+        (p) => p.addFlag(
+          'no-network',
+          negatable: false,
+          help: 'Skip the pub.dev presence census.',
+        ),
+      ),
+    )
     ..addCommand(
       'tags',
-      ArgParser()
-        ..addFlag('plain', negatable: false, help: 'Print tags space-separated (CI-friendly) instead of JSON.'),
+      _subcommandParser(
+        (p) => p.addFlag(
+          'plain',
+          negatable: false,
+          help: 'Print tags space-separated (CI-friendly) instead of JSON.',
+        ),
+      ),
     )
     ..addCommand(
       'product-release',
-      ArgParser()
-        ..addOption(
+      _subcommandParser(
+        (p) => p.addOption(
           'tag',
-          help: 'Per-package publish tag — prints the product tag when the tag names the product package.',
+          help:
+              'Per-package publish tag — prints the product tag when the tag '
+              'names the product package.',
         ),
+      ),
     )
     ..addCommand(
       'release-notes',
-      ArgParser()
-        ..addOption('package', help: 'Package whose CHANGELOG section becomes the release notes.')
-        ..addOption('version', help: 'Version heading to extract, e.g. 7.2.1.'),
+      _subcommandParser(
+        (p) => p
+          ..addOption(
+            'package',
+            help: 'Package whose CHANGELOG section becomes the release notes.',
+          )
+          ..addOption(
+            'version',
+            help: 'Version heading to extract, e.g. 7.2.1.',
+          ),
+      ),
     )
     ..addCommand(
       'runner',
-      ArgParser()
-        ..addOption('tag', help: 'Release tag, e.g. <package>-v<version>.')
-        ..addOption(
-          'cwd',
-          help: 'Working directory of the consumer repository.',
-          defaultsTo: '.',
-        ),
+      _subcommandParser(
+        (p) => p
+          ..addOption('tag', help: 'Release tag, e.g. <package>-v<version>.')
+          ..addOption(
+            'cwd',
+            help: 'Working directory of the consumer repository.',
+            defaultsTo: '.',
+          ),
+      ),
     )
     ..addCommand(
       'publish-tag',
-      ArgParser()
-        ..addOption('tag', help: 'Release tag, e.g. <package>-v<version>. Defaults to GITHUB_REF_NAME.')
-        ..addFlag('execute', negatable: false, help: 'Publish for real (omit = preflight only).')
-        ..addFlag('skip-existing', defaultsTo: true, help: 'Skip when pub.dev already exposes the version.')
-        ..addOption(
-          'dependency-wait-minutes',
-          defaultsTo: '15',
-          help: 'How long to wait for same-train dependency floors to land on pub.dev before failing.',
-        )
-        ..addFlag(
-          'skip-dependency-gate',
-          defaultsTo: false,
-          help: 'Publish as-is without the dependency gate; pub.dev upload validation remains the arbiter.',
-        ),
+      _subcommandParser(
+        (p) => p
+          ..addOption(
+            'tag',
+            help:
+                'Release tag, e.g. <package>-v<version>. Defaults to '
+                'GITHUB_REF_NAME.',
+          )
+          ..addFlag(
+            'execute',
+            negatable: false,
+            help: 'Publish for real (omit = preflight only).',
+          )
+          ..addFlag(
+            'skip-existing',
+            defaultsTo: true,
+            help: 'Skip when pub.dev already exposes the version.',
+          )
+          ..addOption(
+            'dependency-wait-minutes',
+            defaultsTo: '15',
+            help:
+                'How long to wait for same-train dependency floors to land on '
+                'pub.dev before failing.',
+          )
+          ..addFlag(
+            'skip-dependency-gate',
+            defaultsTo: false,
+            help:
+                'Publish as-is without the dependency gate; pub.dev upload '
+                'validation remains the arbiter.',
+          ),
+      ),
     );
+}
+
+Future<void> main(List<String> arguments) async {
+  final parser = buildArgParser();
 
   ArgResults args;
   try {
@@ -100,7 +196,7 @@ Future<void> main(List<String> arguments) async {
       command.options.contains('help') &&
       command.wasParsed('help') &&
       command['help'] == true) {
-    stdout.writeln(parser.commands[command.name]!.usage);
+    _printCommandHelp(parser, command.name!);
     exit(0);
   }
   if (command == null) {
@@ -129,42 +225,42 @@ Future<void> main(List<String> arguments) async {
       'add' => await runAdd(changesetsDir, graph, command),
       'status' => await runStatus(changesetsDir, graph, config),
       'version' => await runVersion(
-          repoRoot.path,
-          changesetsDir,
-          graph,
-          config,
-          checkOnly: command['check'] as bool,
-        ),
+        repoRoot.path,
+        changesetsDir,
+        graph,
+        config,
+        checkOnly: command['check'] as bool,
+      ),
       'doctor' => await runDoctorCommand(
-          graph,
-          config,
-          changesetsDir,
-          census: !(command['no-network'] as bool),
-        ),
+        graph,
+        config,
+        changesetsDir,
+        census: !(command['no-network'] as bool),
+      ),
       'tags' => runTags(changesetsDir, plain: command['plain'] as bool),
       'product-release' => runProductRelease(
-          changesetsDir,
-          config,
-          tag: command['tag'] as String?,
-        ),
+        changesetsDir,
+        config,
+        tag: command['tag'] as String?,
+      ),
       'release-notes' => runReleaseNotes(graph, command),
       'runner' => await runRunner(command),
       'publish-tag' => await runPublishTag(
-          repoRoot.path,
-          graph,
-          config,
-          command,
-        ),
+        repoRoot.path,
+        graph,
+        config,
+        command,
+      ),
       'pubspec-ahead-warnings' => await runPubspecAheadWarnings(
-          repoRoot.path,
-          changesetsDir,
-          graph,
-          config,
-        ),
+        repoRoot.path,
+        changesetsDir,
+        graph,
+        config,
+      ),
       _ => () {
-          stderr.writeln('dart_changesets: unknown command "${command.name}".');
-          return 64;
-        }(),
+        stderr.writeln('dart_changesets: unknown command "${command.name}".');
+        return 64;
+      }(),
     };
     exit(code);
   } on FormatException catch (e) {
@@ -179,20 +275,27 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
+void _printCommandHelp(ArgParser root, String name) {
+  final cmd = root.commands[name]!;
+  stdout.writeln('Usage: dart_changesets $name [options]');
+  final description = _commandDescriptions[name];
+  if (description != null && description.isNotEmpty) {
+    stdout.writeln('');
+    stdout.writeln(description);
+  }
+  stdout.writeln('');
+  stdout.writeln(cmd.usage);
+}
+
 void _printUsage(ArgParser parser) {
   stdout.writeln('Usage: dart_changesets [options] <command>');
   stdout.writeln('');
   stdout.writeln('Commands:');
-  stdout.writeln('  add            Create an intent file (interactive or --package/--bump/--message)');
-  stdout.writeln('  status         Show pending intents and planned releases');
-  stdout.writeln('  version        Apply the version train (--check to detect only)');
-  stdout.writeln('  doctor         Repository gates and pub.dev census');
-  stdout.writeln('  tags           List tags for the pending train');
-  stdout.writeln('  product-release        Product tag metadata for CI');
-  stdout.writeln('  pubspec-ahead-warnings Unreleased pubspec vs tags (advisory)');
-  stdout.writeln('  release-notes  Changelog section for GitHub releases');
-  stdout.writeln('  runner         dart or flutter for a publish tag');
-  stdout.writeln('  publish-tag    Per-tag publish preflight or execute');
+  for (final name in parser.commands.keys) {
+    final summary = _commandDescriptions[name] ?? name;
+    final pad = name.length < 24 ? ' ' * (24 - name.length) : ' ';
+    stdout.writeln('  $name$pad$summary');
+  }
   stdout.writeln('');
   stdout.writeln(parser.usage);
 }
@@ -221,7 +324,11 @@ Future<int> runPubspecAheadWarnings(
   ChangesetsConfig config,
 ) async {
   final changesets = Changeset.loadPending(changesetsDir);
-  final plan = computePlan(graph: graph, changesets: changesets, config: config);
+  final plan = computePlan(
+    graph: graph,
+    changesets: changesets,
+    config: config,
+  );
   final warnings = await pubspecAheadWarnings(
     repoRoot: repoRoot,
     plan: plan,
@@ -238,7 +345,11 @@ Future<int> runPubspecAheadWarnings(
 // add
 // ---------------------------------------------------------------------------
 
-Future<int> runAdd(String changesetsDir, WorkspaceGraph graph, ArgResults args) async {
+Future<int> runAdd(
+  String changesetsDir,
+  WorkspaceGraph graph,
+  ArgResults args,
+) async {
   final publishableNames = graph.publishable.map((pkg) => pkg.name).toList();
   if (publishableNames.isEmpty) {
     stderr.writeln('dart_changesets: no publishable packages found.');
@@ -279,9 +390,7 @@ Future<int> runAdd(String changesetsDir, WorkspaceGraph graph, ArgResults args) 
   final stamp = DateTime.now().toUtc().millisecondsSinceEpoch;
   final path = p.join(changesetsDir, '${stamp}_$slug.md');
   Directory(changesetsDir).createSync(recursive: true);
-  File(path).writeAsStringSync(
-    "---\n'$package': ${bump.name}\n---\n\n$body\n",
-  );
+  File(path).writeAsStringSync("---\n'$package': ${bump.name}\n---\n\n$body\n");
   stdout.writeln('OK: wrote $path');
   return 0;
 }
@@ -319,7 +428,9 @@ String _slugify(String text) {
       .toLowerCase()
       .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
       .replaceAll(RegExp(r'^-+|-+$'), '');
-  return slug.isEmpty ? 'changeset' : slug.substring(0, slug.length.clamp(0, 48));
+  return slug.isEmpty
+      ? 'changeset'
+      : slug.substring(0, slug.length.clamp(0, 48));
 }
 
 // ---------------------------------------------------------------------------
@@ -343,7 +454,11 @@ Future<int> runStatus(
         .join(', ');
     print('  ${p.basename(changeset.path)}: $summary');
   }
-  final plan = computePlan(graph: graph, changesets: changesets, config: config);
+  final plan = computePlan(
+    graph: graph,
+    changesets: changesets,
+    config: config,
+  );
   if (plan.isEmpty) {
     print('Nothing to release.');
     return 0;
@@ -377,7 +492,11 @@ Future<int> runVersion(
   required bool checkOnly,
 }) async {
   final changesets = Changeset.loadPending(changesetsDir);
-  final plan = computePlan(graph: graph, changesets: changesets, config: config);
+  final plan = computePlan(
+    graph: graph,
+    changesets: changesets,
+    config: config,
+  );
   for (final error in plan.errors) {
     stderr.writeln('warning: $error');
   }
@@ -429,8 +548,9 @@ Future<int> runVersion(
     print('  $path');
   }
   print('Consumed ${applied.consumedChangesets.length} changeset(s).');
-  final trainJson =
-      jsonDecode(File(applied.trainsFilePath).readAsStringSync()) as List<dynamic>;
+  final trainJson = jsonDecode(
+    File(applied.trainsFilePath).readAsStringSync(),
+  ) as List<dynamic>;
   final tagNames = <String>[
     for (final entry in trainJson)
       (entry as Map<String, dynamic>)['tag'] as String,
@@ -455,8 +575,10 @@ Future<int> runDoctorCommand(
     changesetsDir: changesetsDir,
     census: census,
   );
-  print('Packages: ${graph.packages.length} total, '
-      '${graph.publishable.length} publishable.');
+  print(
+    'Packages: ${graph.packages.length} total, '
+    '${graph.publishable.length} publishable.',
+  );
   for (final finding in report.findings) {
     print(finding);
   }
@@ -500,8 +622,7 @@ int runTags(String changesetsDir, {required bool plain}) {
   }
   final list = jsonDecode(file.readAsStringSync()) as List<dynamic>;
   final tags = <String>[
-    for (final entry in list)
-      (entry as Map<String, dynamic>)['tag'] as String,
+    for (final entry in list) (entry as Map<String, dynamic>)['tag'] as String,
   ];
   // Replaces the python JSON one-liner in action.yml: plain output parses
   // with shell word-splitting alone.
@@ -558,16 +679,15 @@ int runReleaseNotes(WorkspaceGraph graph, ArgResults args) {
   }
   final pkg = graph.packages[packageName];
   if (pkg == null) {
-    stderr.writeln('dart_changesets: "$packageName" is not a workspace package.');
+    stderr.writeln(
+      'dart_changesets: "$packageName" is not a workspace package.',
+    );
     return 64;
   }
-  final changelogPath =
-      '${pkg.directory}${Platform.pathSeparator}CHANGELOG.md';
+  final changelogPath = '${pkg.directory}${Platform.pathSeparator}CHANGELOG.md';
   final file = File(changelogPath);
   if (!file.existsSync()) {
-    stderr.writeln(
-      'dart_changesets: no CHANGELOG.md at $changelogPath.',
-    );
+    stderr.writeln('dart_changesets: no CHANGELOG.md at $changelogPath.');
     return 1;
   }
   final notes = extractReleaseNotes(
@@ -608,7 +728,8 @@ Future<int> runRunner(ArgResults args) async {
   }
   config ??= const ChangesetsConfig();
 
-  final tag = (args['tag'] as String?) ?? Platform.environment['GITHUB_REF_NAME'];
+  final tag =
+      (args['tag'] as String?) ?? Platform.environment['GITHUB_REF_NAME'];
   if (tag == null || tag.isEmpty) {
     stderr.writeln('dart_changesets: runner requires --tag.');
     return publishExitUsage;
@@ -623,7 +744,9 @@ Future<int> runRunner(ArgResults args) async {
   final graph = await WorkspaceGraph.load(dir.path, config);
   final pkg = graph.packages[parsed.$1];
   if (pkg == null) {
-    stderr.writeln('dart_changesets: "${parsed.$1}" is not a workspace package.');
+    stderr.writeln(
+      'dart_changesets: "${parsed.$1}" is not a workspace package.',
+    );
     return publishExitUsage;
   }
   print(publishRunner(graph, pkg));
@@ -644,8 +767,7 @@ Future<int> runPublishTag(
     );
     return publishExitUsage;
   }
-  final waitMinutes =
-      int.tryParse(args['dependency-wait-minutes'] as String);
+  final waitMinutes = int.tryParse(args['dependency-wait-minutes'] as String);
   if (waitMinutes == null || waitMinutes < 0) {
     stderr.writeln(
       'dart_changesets: --dependency-wait-minutes must be a non-negative '

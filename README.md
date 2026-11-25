@@ -341,10 +341,12 @@ The action and the reusable publish workflow run this repo's own train
 (`.github/workflows/release.yml` + `self_publish.yml`). The engine package
 lives at the repository root; write an intent file to release it.
 
-**Note:** Version **0.3.0** merged to `main` but never shipped to pub.dev (tags
-never pushed). The next automated release will be **`1.0.0`** (`dart_changesets-v1.0.0`
-tag; major intent on this branch together with remaining pending changesets) with
-that changelog included.
+This repo releases like any consumer: add a patch/minor/major intent under
+`.changesets/`, merge the version PR the assembler opens, and the self-release
+workflow tags and publishes each package. **1.0.1** is the first **1.x** on
+pub.dev (the `dart_changesets-v1.0.0` tag exists on GitHub but never published
+because of a layout warning, fixed in 1.0.1). What ships next is whatever
+pending intents say — not hardcoded here.
 
 ## ✨ Contributors
 
