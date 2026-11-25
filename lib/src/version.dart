@@ -1,2 +1,2 @@
 /// Package version — keep in sync with pubspec.yaml `version:`.
-const packageVersion = '1.0.0';
+const packageVersion = '1.0.1';
