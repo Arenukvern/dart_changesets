@@ -336,8 +336,9 @@ The action and the reusable publish workflow run this repo's own train
 lives at the repository root; write an intent file to release it.
 
 **Note:** Version **0.3.0** merged to `main` but never shipped to pub.dev (tags
-never pushed). The next automated release will be **0.4.0+** (pending minors on
-main plus this PR’s patch) with that changelog included.
+never pushed). The next automated release will be **`1.0.0`** (`dart_changesets-v1.0.0`
+tag; major intent on this branch together with remaining pending changesets) with
+that changelog included.
 
 ## Contributing & community
 
