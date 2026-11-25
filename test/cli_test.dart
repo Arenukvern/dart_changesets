@@ -40,6 +40,30 @@ void main() {
       expect(result.stdout, contains('publish-tag'));
     });
 
+    const subcommands = <String>[
+      'add',
+      'pubspec-ahead-warnings',
+      'status',
+      'version',
+      'doctor',
+      'tags',
+      'product-release',
+      'release-notes',
+      'runner',
+      'publish-tag',
+    ];
+
+    for (final name in subcommands) {
+      test('$name --help exits zero with description and options', () {
+        final result = runCli(<String>[name, '--help']);
+        expect(result.exitCode, 0, reason: result.stderr);
+        expect(result.stdout, startsWith('Usage: dart_changesets $name'));
+        expect(result.stdout, contains('-h, --help'));
+        expect(result.stdout, contains('dart_changesets $name [options]'));
+        expect(result.stderr, isEmpty);
+      });
+    }
+
     test('missing command exits 64 without stack trace', () {
       final result = runCli(const <String>[]);
       expect(result.exitCode, 64);
