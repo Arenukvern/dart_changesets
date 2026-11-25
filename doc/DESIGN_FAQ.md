@@ -2,6 +2,11 @@
 
 Standing **why** answers for the release engine. For step-by-step usage see [DX_FAQ.md](DX_FAQ.md). Strategic decisions live in [doc/decisions/](decisions/); this file compresses operational rationale.
 
+## Charter
+
+**Q: Where is the product charter maintained?**
+A: [NORTH_STAR.md](NORTH_STAR.md) — outcome, success table, and boundaries. `AGENTS.md` is only the agent map; `steward.yaml` points `vision_source` at the North Star.
+
 ## Release model
 
 **Q: Why intent files in `.changesets/` instead of conventional commits?**

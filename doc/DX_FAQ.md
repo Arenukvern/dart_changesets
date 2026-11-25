@@ -5,6 +5,7 @@
 ## 🧭 Router
 
 ```text
+CHARTER           → doc/NORTH_STAR.md
 WHY / ADRs          → doc/DESIGN_FAQ.md, doc/decisions/
 HOW contribute    → this file, ../CONTRIBUTING.md, ../AGENTS.md
 Agent invariants  → ../AGENTS.md, skills/dart-changesets-maintainer/SKILL.md

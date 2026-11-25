@@ -4,6 +4,9 @@ alwaysApply: true
 
 # FAQ Documentation Usage — dart_changesets
 
+**Q: Where is the charter?**
+A: `doc/NORTH_STAR.md` — product outcome and boundaries. Not DESIGN_FAQ or AGENTS.md.
+
 **Q: What is `doc/DESIGN_FAQ.md` for?**
 A: Standing **why** for the release engine (intents, per-tag pub.dev, OIDC without GitHub environments, dependency wait, tags, self-release). Use when changing architecture, invariants, or documenting trade-offs. Link to `doc/decisions/` ADRs for full deliberation.
 

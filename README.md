@@ -380,9 +380,11 @@ More detail: [CONTRIBUTING.md](CONTRIBUTING.md#contributor-credit).
 
 ## Documentation
 
+- [doc/NORTH_STAR.md](doc/NORTH_STAR.md) — charter, success criteria, boundaries
 - [doc/DESIGN_FAQ.md](doc/DESIGN_FAQ.md) — why the engine is shaped this way (intents, per-tag publish, OIDC, dependency wait)
 - [doc/DX_FAQ.md](doc/DX_FAQ.md) — how to develop, consume, and troubleshoot trains
 - [doc/decisions/](doc/decisions/) — ADRs for cross-cutting decisions
+- [AGENTS.md](AGENTS.md) — agent map (validation, invariants, file pointers)
 
 ## Contributing & community
 
