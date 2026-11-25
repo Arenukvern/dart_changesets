@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+### Patch Changes
+
+- CLI: every subcommand now supports `dart_changesets <cmd> --help` with a short description and its options (previously only `add` did). README self-release section updated to describe changeset-driven releases without a stale “next version” line.
+
 ## 1.0.1
 
 ### Patch Changes
@@ -98,6 +104,7 @@
   publish train, composite GitHub Action, and reusable publish workflow.
 - Extracted from `pkgs/dart_changesets` in `xsoulspace/dart_flutter_packages`
   (ADR 0073 there).
+
 
 
 
