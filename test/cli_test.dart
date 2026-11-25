@@ -9,9 +9,8 @@ import 'fixtures.dart';
 void writeIntentFile(Directory root, String name, String frontmatter) {
   final dir = Directory(p.join(root.path, '.changesets'));
   dir.createSync(recursive: true);
-  File(p.join(dir.path, '$name.md')).writeAsStringSync(
-    '---\n$frontmatter---\n\nChange.\n',
-  );
+  File(p.join(dir.path, '$name.md'))
+      .writeAsStringSync('---\n$frontmatter---\n\nChange.\n');
 }
 
 void main() {
@@ -19,15 +18,12 @@ void main() {
 
   final entrypoint = p.join(packageRoot, 'bin', 'dart_changesets.dart');
 
-  ProcessResult runCli(
-    List<String> args, {
-    String? workingDirectory,
-  }) {
-    return Process.runSync(
-      Platform.resolvedExecutable,
-      <String>['run', entrypoint, ...args],
-      workingDirectory: workingDirectory ?? packageRoot,
-    );
+  ProcessResult runCli(List<String> args, {String? workingDirectory}) {
+    return Process.runSync(Platform.resolvedExecutable, <String>[
+      'run',
+      entrypoint,
+      ...args,
+    ], workingDirectory: workingDirectory ?? packageRoot);
   }
 
   group('CLI', () {
@@ -55,13 +51,10 @@ void main() {
       late Directory repo;
 
       setUp(() {
-        repo = buildFixtureRepo({
-          'a': const FixturePackage(version: '1.0.0'),
-        });
+        repo = buildFixtureRepo({'a': const FixturePackage(version: '1.0.0')});
         Directory(p.join(repo.path, '.changesets')).createSync();
-        File(p.join(repo.path, 'changesets.yaml')).writeAsStringSync(
-          'packages: pkgs/*\n',
-        );
+        File(p.join(repo.path, 'changesets.yaml'))
+            .writeAsStringSync('packages_dir: pkgs\n');
         writeIntentFile(repo, 'intent', "'a': patch\n");
       });
 
@@ -75,17 +68,25 @@ void main() {
       });
 
       test('tags --plain reads pending train', () {
-        final train = File(p.join(repo.path, '.changesets', '.pending-train.json'));
+        final train = File(
+          p.join(repo.path, '.changesets', '.pending-train.json'),
+        );
         train.writeAsStringSync(
           '[{"package":"a","version":"1.0.1","tag":"a-v1.0.1","directory":"x"}]',
         );
-        final result = runCli(const ['tags', '--plain'], workingDirectory: repo.path);
+        final result = runCli(const [
+          'tags',
+          '--plain',
+        ], workingDirectory: repo.path);
         expect(result.exitCode, 0, reason: result.stderr);
         expect(result.stdout.trim(), 'a-v1.0.1');
       });
 
       test('version --check reports due PR', () {
-        final result = runCli(const ['version', '--check'], workingDirectory: repo.path);
+        final result = runCli(const [
+          'version',
+          '--check',
+        ], workingDirectory: repo.path);
         expect(result.exitCode, 1);
         expect(result.stderr, isEmpty);
         expect(result.stdout, contains('version PR due'));
