@@ -40,6 +40,16 @@ We are **not** a general CI system, **not** a substitute for pub.dev’s first-p
 - **Package docs live under `doc/`** — never create top-level `docs/` (strict publish dry-run fails).
 - **Strategic why** → `doc/decisions/` ADR; **standing why** → [DESIGN_FAQ.md](DESIGN_FAQ.md); **how** → [DX_FAQ.md](DX_FAQ.md).
 
+## Falsifiers
+
+We are off-mission if any of these become routine:
+
+- Consumers must manually re-dispatch most packages in a train after every merge (dependency wait or skip-existing no longer converge trains).
+- The engine ships batch-publish-from-one-ref behavior as the default path.
+- GitHub `environment` declarations return to the reusable publish workflow without an ADR.
+- Strict `dart pub publish --dry-run` passes while layout warnings exist (e.g. top-level `docs/`).
+- Version math moves off `package:pub_semver` or drops cascade test coverage.
+
 ## Archetype
 
 Primary surface: **CLI/tool** (`steward.yaml` → `cli_tool`). Proof is commands (`dart_changesets --help`), tests, typed publish exit codes, and release artifact provenance on pub.dev and GitHub Marketplace.

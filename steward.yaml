@@ -51,6 +51,7 @@ stewardship:
   strategic_alignment:
     vision_source: doc/NORTH_STAR.md
     success_evidence: required
+    falsifiers: doc/NORTH_STAR.md#falsifiers
   security:
     action_effects: required
     redaction: steward/redaction/v1
