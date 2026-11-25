@@ -319,8 +319,9 @@ Future<int> runVersion(
     config: config,
   );
   if (drift.isNotEmpty) {
-    stderr.writeln('FAIL: release drift detected — refusing to assemble a '
-        'train on top of it:');
+    stderr.writeln(
+      'FAIL: release drift detected — refusing to assemble a train:',
+    );
     for (final line in drift) {
       stderr.writeln('  - $line');
     }

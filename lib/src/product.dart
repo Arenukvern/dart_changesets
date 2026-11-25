@@ -101,14 +101,18 @@ String? extractReleaseNotes({
   return lines.sublist(start, end).join('\n').trim();
 }
 
-/// Drift guard for a train about to be applied: a package whose pubspec
-/// version is AHEAD of its newest release tag means either the previous
-/// train's tags were never pushed or the pubspec was hand-bumped — applying
-/// a new train on top would double-bump (observed on oka 2026-11-22: the
-/// version PR rebumped pre-bumped pubspecs because the pubspec current
-/// version is the bump BASE). Returns one problem line per drifted package;
-/// empty means clean. Best-effort: a git failure returns no findings rather
-/// than blocking trains on environments without tags.
+/// Drift guard for a train about to be applied.
+///
+/// **Allows** pubspec **ahead** of the newest release tag: a version PR may
+/// have merged without tags being pushed (e.g. 0.3.0 stall). The pubspec
+/// version is the bump base, so the next train publishes a newer semver with
+/// changelog already on main.
+///
+/// **Blocks** pubspec **behind** the newest tag — inconsistent with pub.dev.
+///
+/// Returns one problem line per blocked package; empty means clean.
+/// Best-effort: a git failure returns no findings rather than blocking
+/// trains on environments without tags.
 Future<List<String>> preReleaseDrift({
   required String repoRoot,
   required ReleasePlan plan,
@@ -147,13 +151,11 @@ Future<List<String>> preReleaseDrift({
     if (tagVersions.isEmpty) continue;
     tagVersions.sort();
     final latest = tagVersions.last;
-    if (release.package.version > latest) {
+    if (release.package.version < latest) {
       problems.add(
-        '$name: pubspec ${release.package.version} is ahead of the newest '
-        'release tag ($latest). Either the previous train\'s tags were '
-        'never pushed, or the pubspec was pre-bumped — assembling this '
-        'train would double-bump. Push the missing tags or restore the '
-        'pubspec to the released version first.',
+        '$name: pubspec ${release.package.version} is behind the newest '
+        'release tag ($latest). Restore the pubspec to at least $latest or '
+        'delete the tag if it was pushed by mistake.',
       );
     }
   }

@@ -302,7 +302,7 @@ across days.
 | `gh pr edit` / GraphQL scope errors on assemble | PAT missing `read:org` (only affects legacy paths) | Upstream action uses REST `PATCH pulls`; update `@v1` |
 | Publish waits then times out | Dependency floor not visible on pub.dev yet | Wait or raise `dependency-wait-minutes`; recovery: `skip-dependency-gate` |
 | Tag exists, version still on pub.dev old | First publish or failed leg | First publish is always manual; re-dispatch publish with skip-existing |
-| `FAIL: release drift detected` | Tags missing after a prior version merge | Re-run release on the version-PR merge commit (or push tags from train JSON) |
+| `FAIL: release drift detected` | Pubspec **behind** a release tag (out of sync with pub.dev) | Restore pubspec to ≥ tagged version, or fix mistaken tags. Pubspec **ahead** of tags (unreleased merge) is OK — the next train bumps from the pubspec |
 
 ## Action ref (`@v1`) and GitHub releases
 
