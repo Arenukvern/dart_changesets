@@ -94,17 +94,23 @@ jobs:
       - name: Install engine
         env:
           ENGINE_REF: ${{ inputs.engine-ref }}
-          JOB_WORKFLOW_SHA: ${{ github.job.workflow_sha }}
-          JOB_WORKFLOW_REF: ${{ github.job.workflow_ref }}
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          JOB_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
         run: |
           set -euo pipefail
           ref="${ENGINE_REF}"
-          repo="Arenukvern/dart_changesets"
+          repo="${JOB_WORKFLOW_REPOSITORY:-Arenukvern/dart_changesets}"
           if [ -z "$ref" ]; then
-            ref="${JOB_WORKFLOW_SHA:-main}"
-            if [ -n "${JOB_WORKFLOW_REF:-}" ]; then
-              repo="$(echo "$JOB_WORKFLOW_REF" | cut -d/ -f1,2)"
+            if [ -n "${JOB_WORKFLOW_SHA:-}" ]; then
+              ref="${JOB_WORKFLOW_SHA}"
+            else
+              echo "::warning::job.workflow_sha unavailable — installing engine from main"
+              ref="main"
             fi
+          fi
+          if [ -z "${JOB_WORKFLOW_REPOSITORY:-}" ]; then
+            echo "::warning::job.workflow_repository unavailable — defaulting repo to Arenukvern/dart_changesets"
+            repo="Arenukvern/dart_changesets"
           fi
           echo "engine: ${repo} @ ${ref}"
           dart pub global activate --source git \

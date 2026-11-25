@@ -161,3 +161,52 @@ Future<List<String>> preReleaseDrift({
   }
   return problems;
 }
+
+/// Advisory lines when a package pubspec is ahead of its newest release tag
+/// (merged version PR but tags never pushed). Does not block assembly.
+Future<List<String>> pubspecAheadWarnings({
+  required String repoRoot,
+  required ReleasePlan plan,
+  required ChangesetsConfig config,
+}) async {
+  if (plan.isEmpty) return const <String>[];
+  final run = await Process.run(
+    'git',
+    const <String>['tag', '--list'],
+    workingDirectory: repoRoot,
+  );
+  if (run.exitCode != 0) return const <String>[];
+  final allTags = (run.stdout as String)
+      .split('\n')
+      .map((raw) => raw.trim())
+      .where((tag) => tag.isNotEmpty)
+      .toList();
+  final warnings = <String>[];
+  for (final release in plan.releases) {
+    final name = release.package.name;
+    final tagVersions = <Version>[];
+    for (final tag in allTags) {
+      final parsed = config.parseTag(tag);
+      if (parsed == null) continue;
+      final (package, versionRaw) = parsed;
+      if (package != name) continue;
+      try {
+        tagVersions.add(Version.parse(versionRaw));
+      } on FormatException {
+        continue;
+      }
+    }
+    if (tagVersions.isEmpty) continue;
+    tagVersions.sort();
+    final latest = tagVersions.last;
+    final current = release.package.version;
+    if (current > latest) {
+      warnings.add(
+        '- $name: pubspec $current is ahead of newest tag $latest '
+        '(changelog on main includes unreleased work; next tag publishes a '
+        'higher version).',
+      );
+    }
+  }
+  return warnings;
+}

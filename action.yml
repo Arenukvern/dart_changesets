@@ -23,7 +23,7 @@
 #       runs-on: ubuntu-latest
 #       steps:
 #         - uses: actions/checkout@v5
-#           with: { fetch-depth: 0 }
+#           with: { fetch-depth: 0 }  # full history for tags + version-PR merge detection
 #         - uses: Arenukvern/dart_changesets@v1
 #           env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
 #
@@ -172,11 +172,6 @@ runs:
             if git diff --name-only HEAD~1 HEAD 2>/dev/null \
               | grep -qE '(^|/)\.changesets/\.pending-train\.json$'; then
               train_touched=true
-            elif [ "$(git rev-list --parents -n 1 HEAD | wc -w)" -gt 2 ]; then
-              if git diff --name-only HEAD^1 HEAD 2>/dev/null \
-                | grep -qE '(^|/)\.changesets/\.pending-train\.json$'; then
-                train_touched=true
-              fi
             fi
           else
             train_touched=true
@@ -226,6 +221,7 @@ runs:
           git checkout -B "$BRANCH"
         fi
         dart_changesets version
+        ahead_warnings="$(dart_changesets pubspec-ahead-warnings 2>/dev/null || true)"
         if git diff --quiet && git diff --cached --quiet; then
           echo "No file changes after apply — the version branch is current."
         else
@@ -243,6 +239,9 @@ runs:
           body=$(cat .changesets/.pending-train.json)
         else
           body="Release train"
+        fi
+        if [ -n "$ahead_warnings" ]; then
+          body="${body}"$'\n\n'"### Unreleased pubspec versions"$'\n'"${ahead_warnings}"
         fi
         if [ "$pr_state" = "OPEN" ]; then
           pr_number="$(gh pr view "$BRANCH" --json number --jq .number)"
@@ -341,9 +340,18 @@ runs:
           done
           if [ "$skip_pin" = "false" ]; then
             echo "== pin action ref $MAJOR_REF =="
+            old_sha="$(git ls-remote origin "refs/tags/${MAJOR_REF}" | awk '{print $1}')"
             git tag -f "$MAJOR_REF" "$merge_sha"
-            if ! git push origin "refs/tags/${MAJOR_REF}:refs/tags/${MAJOR_REF}" --force-with-lease 2>/dev/null; then
-              echo "::warning::could not move $MAJOR_REF (ref protected or workflows permission missing?)"
+            if [ -n "$old_sha" ]; then
+              if ! git push origin \
+                "refs/tags/${MAJOR_REF}:refs/tags/${MAJOR_REF}" \
+                --force-with-lease="refs/tags/${MAJOR_REF}:${old_sha}"; then
+                echo "::warning::could not move $MAJOR_REF (stale lease, ref protected, or missing workflows permission on token)"
+              fi
+            else
+              if ! git push origin "$MAJOR_REF"; then
+                echo "::warning::could not create $MAJOR_REF"
+              fi
             fi
           fi
         fi

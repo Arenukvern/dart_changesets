@@ -2,9 +2,10 @@
 
 ## 0.3.0
 
-> **Never published to pub.dev** — the version-PR merged on 2026-11-24 but
-> release mode failed before tags were pushed. Changelog entries below ship
-> with the next release (0.3.1+).
+> **Never published to pub.dev** — the version-PR merged on 2026-11-24, then
+> assemble on the next push hit the drift guard (pubspec ahead of tags, exit 65)
+> before release mode could push tags. Changelog entries below ship with the
+> next release (**0.4.0+**; pending minors on main).
 
 ### Minor Changes
 

@@ -16,10 +16,12 @@ Future<void> main(List<String> arguments) async {
     ..addCommand(
       'add',
       ArgParser()
+        ..addFlag('help', abbr: 'h', negatable: false, help: 'Usage for add.')
         ..addOption('package', abbr: 'p', help: 'Package name (non-interactive).')
         ..addOption('bump', abbr: 'b', help: 'major, minor, or patch.')
         ..addOption('message', abbr: 'm', help: 'Changelog summary (one line).'),
     )
+    ..addCommand('pubspec-ahead-warnings')
     ..addCommand('status')
     ..addCommand(
       'version',
@@ -94,6 +96,10 @@ Future<void> main(List<String> arguments) async {
     exit(0);
   }
   final command = args.command;
+  if (command != null && command['help'] == true) {
+    stdout.writeln(parser.commands[command.name]!.usage);
+    exit(0);
+  }
   if (command == null) {
     stderr.writeln('dart_changesets: command required');
     stderr.writeln('');
@@ -146,6 +152,12 @@ Future<void> main(List<String> arguments) async {
           config,
           command,
         ),
+      'pubspec-ahead-warnings' => await runPubspecAheadWarnings(
+          repoRoot.path,
+          changesetsDir,
+          graph,
+          config,
+        ),
       _ => () {
           stderr.writeln('dart_changesets: unknown command "${command.name}".');
           return 64;
@@ -173,7 +185,8 @@ void _printUsage(ArgParser parser) {
   stdout.writeln('  version        Apply the version train (--check to detect only)');
   stdout.writeln('  doctor         Repository gates and pub.dev census');
   stdout.writeln('  tags           List tags for the pending train');
-  stdout.writeln('  product-release  Product tag metadata for CI');
+  stdout.writeln('  product-release        Product tag metadata for CI');
+  stdout.writeln('  pubspec-ahead-warnings Unreleased pubspec vs tags (advisory)');
   stdout.writeln('  release-notes  Changelog section for GitHub releases');
   stdout.writeln('  runner         dart or flutter for a publish tag');
   stdout.writeln('  publish-tag    Per-tag publish preflight or execute');
@@ -192,6 +205,30 @@ Directory? findRepoRoot() {
     if (parent.path == dir.path) return null;
     dir = parent;
   }
+}
+
+// ---------------------------------------------------------------------------
+// pubspec-ahead-warnings
+// ---------------------------------------------------------------------------
+
+Future<int> runPubspecAheadWarnings(
+  String repoRoot,
+  String changesetsDir,
+  WorkspaceGraph graph,
+  ChangesetsConfig config,
+) async {
+  final changesets = Changeset.loadPending(changesetsDir);
+  final plan = computePlan(graph: graph, changesets: changesets, config: config);
+  final warnings = await pubspecAheadWarnings(
+    repoRoot: repoRoot,
+    plan: plan,
+    config: config,
+  );
+  if (warnings.isEmpty) return 0;
+  for (final line in warnings) {
+    print(line);
+  }
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +405,13 @@ Future<int> runVersion(
       stderr.writeln('  - $line');
     }
     return 65;
+  }
+  for (final line in await pubspecAheadWarnings(
+    repoRoot: repoRoot,
+    plan: plan,
+    config: config,
+  )) {
+    stderr.writeln('warning: $line');
   }
   final applied = applyPlan(
     plan: plan,

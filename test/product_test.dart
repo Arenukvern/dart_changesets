@@ -578,20 +578,6 @@ version_files:
       }
     });
 
-    test('passes when git has no tags at all', () async {
-      final root = await gitFixtureRepo('1.0.0');
-      try {
-        final graph = await WorkspaceGraph.load(
-          root.path,
-          const ChangesetsConfig(packagesDir: 'pkgs'),
-        );
-        final problems = await drift(root, graph);
-        expect(problems, isEmpty);
-      } finally {
-        teardownRepo(root);
-      }
-    });
-
     test('first release (no tags) passes', () async {
       final root = Directory.systemTemp.createTempSync('dc_drift_fresh_');
       Directory('${root.path}/pkgs/new').createSync(recursive: true);

@@ -39,7 +39,8 @@ pin `@v1` for the current major.
    events do not need that toggle.
 
 3. **Two workflow files** (copy from [example/consumer-workflows](example/consumer-workflows)):
-   `release.yml` (push to main) and `publish.yml` (per-tag pub.dev publish).
+   `release.yml` (push to main; `actions/checkout` needs `fetch-depth: 0`) and
+   `publish.yml` (per-tag pub.dev publish).
 4. **Write an intent file** inside any PR:
 
    ```markdown
@@ -312,14 +313,18 @@ Consumers pin `Arenukvern/dart_changesets@v1`. The composite action installs
 the CLI from **`GITHUB_ACTION_PATH`** (the checked-out action tree), not from
 the consumer’s `GITHUB_SHA`.
 
-Reusable `publish.yml` installs from **`github.job.workflow_sha`** in the
-**called** workflow repository (not the caller’s `github.workflow_sha`). Override
-with `engine-ref` when pinning a specific tag.
+Reusable `publish.yml` installs from **`job.workflow_sha`** / **`job.workflow_repository`**
+in the called workflow repository (`github.job` is the caller job id — do not use).
+Unavailable on GHES → warning and `main` fallback. Override with `engine-ref`
+when pinning a specific tag. Checkout must use **`fetch-depth: 0`** so release
+mode can read tags and train history.
 
 Only this repository sets `major-action-ref: v1` on self-release to move the
-`v1` pointer after each version-PR merge. That step is **warn-only** on failure
-and may need extra `workflows: write` permission when the merge commit touches
-workflow files under the default token policy.
+`v1` pointer after each version-PR merge (`git ls-remote` + `--force-with-lease`
+on the tag ref). That step is **warn-only** on failure. The default
+`GITHUB_TOKEN` cannot receive `workflows: write` — use a **PAT or GitHub App
+token** with `workflows` permission when tag moves must succeed across commits
+that touch workflow files.
 
 When `product_tag` is configured, the merge can also create product-shaped tags
 and GitHub releases — optional for consumers.
@@ -331,8 +336,8 @@ The action and the reusable publish workflow run this repo's own train
 lives at the repository root; write an intent file to release it.
 
 **Note:** Version **0.3.0** merged to `main` but never shipped to pub.dev (tags
-never pushed). The next automated release will be **0.3.1+** with that
-changelog included.
+never pushed). The next automated release will be **0.4.0+** (pending minors on
+main plus this PR’s patch) with that changelog included.
 
 ## Contributing & community
 
