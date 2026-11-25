@@ -27,7 +27,7 @@ conventions (pub_semver math, cascade test coverage, action/engine pairing).
 - **Authorization is tag-pattern OIDC, no GitHub environment** — repository +
   per-package tag pattern + pubspec version (dart.dev rules; dart-lang/core
   publishes the same way). Decision record:
-  [docs/decisions/0001-no-github-environment-in-publish-path.md](../docs/decisions/0001-no-github-environment-in-publish-path.md).
+  [doc/decisions/0001-no-github-environment-in-publish-path.md](../doc/decisions/0001-no-github-environment-in-publish-path.md).
   Enabling pub.dev's "Require GitHub Actions environment" checkbox on a
   consumer package makes its publish fail loudly by design.
 - **Train convergence is owned by `publish-tag`** — the dependency wait
@@ -35,7 +35,7 @@ conventions (pub_semver math, cascade test coverage, action/engine pairing).
   its same-train floors are visible on pub.dev. Configurable via
   `--dependency-wait-minutes` and the reusable workflow's
   `dependency-wait-minutes` input (`0` = fail fast). Decision record:
-  [docs/decisions/0002-dependency-wait-owned-by-publish-tag.md](../docs/decisions/0002-dependency-wait-owned-by-publish-tag.md).
+  [doc/decisions/0002-dependency-wait-owned-by-publish-tag.md](../doc/decisions/0002-dependency-wait-owned-by-publish-tag.md).
 - **The floating `v1` tag is the consumer contract.** Consumers resolve
   `uses: …@v1`; merging a workflow change alone is inert — activation is the
   hand force-move of `v1` to the released commit (CONTRIBUTING). Move it only
@@ -50,7 +50,7 @@ conventions (pub_semver math, cascade test coverage, action/engine pairing).
    format); the repo releases itself through the same train it provides.
 3. For consumer-facing behavior changes: update the README section the
    change touches (consumers read the README, not this repo's issues), add or
-   amend an ADR under `docs/decisions/`, then merge and force-move `v1`.
+   amend an ADR under `doc/decisions/`, then merge and force-move `v1`.
 4. Debugging a consumer train: read the failing `dart_changesets publish` run
    — exit 64 usage, 65 bootstrap, 66 dependency-wait expiry (re-dispatch
    after the sibling lands; skip-existing keeps the rest), 67 publish, 68

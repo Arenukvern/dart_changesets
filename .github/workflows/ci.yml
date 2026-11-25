@@ -16,3 +16,5 @@ jobs:
       - run: dart pub get
       - run: dart analyze
       - run: dart test
+      - name: Strict publish dry-run (warnings fail)
+        run: dart pub publish --dry-run
