@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+### Patch Changes
+
+- Add DESIGN_FAQ, DX_FAQ, and NORTH_STAR under doc/, align steward.yaml and AGENTS.md with Skill Steward governance shape, and wire documentation links plus faq_usage agent rule.
+
 ## 1.0.2
 
 ### Patch Changes
@@ -104,6 +110,7 @@
   publish train, composite GitHub Action, and reusable publish workflow.
 - Extracted from `pkgs/dart_changesets` in `xsoulspace/dart_flutter_packages`
   (ADR 0073 there).
+
 
 
 
