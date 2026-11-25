@@ -2,6 +2,10 @@
 
 ## 0.3.0
 
+> **Never published to pub.dev** — the version-PR merged on 2026-11-24 but
+> release mode failed before tags were pushed. Changelog entries below ship
+> with the next release (0.3.1+).
+
 ### Minor Changes
 
 - **Changelog comment banners stay above the new version section.**

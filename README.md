@@ -29,9 +29,18 @@ The action is published on the
 [GitHub Marketplace](https://github.com/marketplace/actions/dart_changesets) —
 pin `@v1` for the current major.
 
-1. **Two workflow files** (copy from [example/consumer-workflows](example/consumer-workflows)):
+**Before the first train:**
+
+1. GitHub **Settings → Actions → General → Workflow permissions** → enable
+   **Allow GitHub Actions to create and approve pull requests** (version PRs).
+2. pub.dev **package → Admin → Automated publishing** → repository + tag pattern;
+   if you publish without a PAT, also enable **Enable publishing from
+   workflow_dispatch events** (`repository_dispatch` is rejected). Tag push
+   events do not need that toggle.
+
+3. **Two workflow files** (copy from [example/consumer-workflows](example/consumer-workflows)):
    `release.yml` (push to main) and `publish.yml` (per-tag pub.dev publish).
-2. **Write an intent file** inside any PR:
+4. **Write an intent file** inside any PR:
 
    ```markdown
    ---
@@ -41,20 +50,13 @@ pin `@v1` for the current major.
    What changed, as changelog prose.
    ```
 
-3. **Merge to main** → the action opens a `chore: version packages` PR
+5. **Merge to main** → the action opens a `chore: version packages` PR
    (version bumps + dependent-constraint cascades + changelogs).
-4. **Merge that PR** → one `<package>-v<version>` tag per release, one
+6. **Merge that PR** → one `<package>-v<version>` tag per release, one
    publish run per tag, ordered by dependency waits.
 
 No conventional-commit discipline is required — release intent lives in
 reviewed files, not commit messages.
-
-**One required repo setting** (GitHub default blocks bot-made PRs):
-Settings → Actions → General → Workflow permissions → check
-**Allow GitHub Actions to create and approve pull requests**. The version
-PR is created by `GITHUB_TOKEN`; with the setting off, assemble runs push
-the version branch but cannot open the PR (and the next assemble run
-repairs it once the setting is on).
 
 **Required workflow permissions** in your release workflow: `contents:
 write`, `pull-requests: write`, and `actions: write` — the last one
@@ -110,16 +112,16 @@ Two optional README badges for consumer repositories — train health and
 attribution:
 
 ```markdown
-[![release train](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/dart_changesets.yml?branch=main&label=release%20train&logo=github)](https://github.com/OWNER/REPO/actions/workflows/dart_changesets.yml)
+[![release train](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/release.yml?branch=main&label=release%20train&logo=github)](https://github.com/OWNER/REPO/actions/workflows/release.yml)
 [![release engine: dart_changesets](https://img.shields.io/badge/release_engine-dart__changesets-0175C2?logo=dart&logoColor=white)](https://github.com/Arenukvern/dart_changesets)
 ```
 
-- The **release train** badge mirrors your `dart_changesets.yml` (release
-  workflow) latest run on the default branch. Red is the first visible
-  signal the train broke — most often the workflow-permission setting above.
+- The **release train** badge mirrors your `release.yml` (release workflow)
+  latest run on the default branch. Red is the first visible signal the train
+  broke — most often the workflow-permission setting above.
 - The **release engine** badge is static attribution to this repository.
 - If a repo avoids third-party image hosts, GitHub's native badge also works:
-  `https://github.com/OWNER/REPO/actions/workflows/dart_changesets.yml/badge.svg`
+  `https://github.com/OWNER/REPO/actions/workflows/release.yml/badge.svg`
   (it shows the workflow's own display name).
 
 Live example: [flutter-mcp-toolkit](https://github.com/Arenukvern/mcp_flutter)
@@ -304,19 +306,33 @@ across days.
 | Tag exists, version still on pub.dev old | First publish or failed leg | First publish is always manual; re-dispatch publish with skip-existing |
 | `FAIL: release drift detected` | Pubspec **behind** a release tag (out of sync with pub.dev) | Restore pubspec to ≥ tagged version, or fix mistaken tags. Pubspec **ahead** of tags (unreleased merge) is OK — the next train bumps from the pubspec |
 
-## Action ref (`@v1`) and GitHub releases
+## Action ref (`@v1`) and engine install
 
-Consumers pin `Arenukvern/dart_changesets@v1`. On each version-PR merge the
-action moves the `v1` tag to that merge commit and installs the reusable
-`publish.yml` from `github.workflow_sha` (the workflow file’s commit), not
-`main`. When `product_tag` is set, the merge also creates a GitHub release
-(e.g. `v0.3.0`) with changelog notes.
+Consumers pin `Arenukvern/dart_changesets@v1`. The composite action installs
+the CLI from **`GITHUB_ACTION_PATH`** (the checked-out action tree), not from
+the consumer’s `GITHUB_SHA`.
+
+Reusable `publish.yml` installs from **`github.job.workflow_sha`** in the
+**called** workflow repository (not the caller’s `github.workflow_sha`). Override
+with `engine-ref` when pinning a specific tag.
+
+Only this repository sets `major-action-ref: v1` on self-release to move the
+`v1` pointer after each version-PR merge. That step is **warn-only** on failure
+and may need extra `workflows: write` permission when the merge commit touches
+workflow files under the default token policy.
+
+When `product_tag` is configured, the merge can also create product-shaped tags
+and GitHub releases — optional for consumers.
 
 ## This repository releases itself
 
 The action and the reusable publish workflow run this repo's own train
 (`.github/workflows/release.yml` + `self_publish.yml`). The engine package
 lives at the repository root; write an intent file to release it.
+
+**Note:** Version **0.3.0** merged to `main` but never shipped to pub.dev (tags
+never pushed). The next automated release will be **0.3.1+** with that
+changelog included.
 
 ## Contributing & community
 

@@ -4,6 +4,7 @@ packages_dir: pkgs
 root_package: true
 dependent_bump: patch
 tag_format: '{package}-v{version}'
-product_tag:
-  package: dart_changesets
-  format: 'v{version}'
+version_files:
+  dart_changesets:
+    - path: lib/src/version.dart
+      pattern: "const packageVersion = '{version}';"

@@ -93,10 +93,10 @@ inputs:
     default: ''
   major-action-ref:
     description: >
-      On release, move this git ref to the version-PR merge commit (default
-      v1 so consumers pinning @v1 pick up the release). Empty disables.
+      On release, move this git ref to the version-PR merge commit (e.g. v1
+      for the engine repo). Empty disables — consumers should leave unset.
     required: false
-    default: 'v1'
+    default: ''
 
 runs:
   using: composite
@@ -111,11 +111,16 @@ runs:
         INPUT_ENGINE_REF: ${{ inputs.engine-ref }}
       run: |
         set -euo pipefail
-        repo="${INPUT_ENGINE_REPO:-${GITHUB_ACTION_REPOSITORY:-Arenukvern/dart_changesets}}"
-        ref="${INPUT_ENGINE_REF:-${GITHUB_ACTION_REF:-${GITHUB_SHA:-main}}}"
-        echo "engine: $repo @ $ref"
-        dart pub global activate --source git \
-          "https://github.com/${repo}.git" --git-ref "$ref"
+        if [ -n "$INPUT_ENGINE_REF" ] || [ -n "$INPUT_ENGINE_REPO" ]; then
+          repo="${INPUT_ENGINE_REPO:-Arenukvern/dart_changesets}"
+          ref="${INPUT_ENGINE_REF:-main}"
+          echo "engine: $repo @ $ref (git)"
+          dart pub global activate --source git \
+            "https://github.com/${repo}.git" --git-ref "$ref"
+        else
+          echo "engine: ${GITHUB_ACTION_PATH} (path)"
+          dart pub global activate --source path "$GITHUB_ACTION_PATH"
+        fi
 
     # checkout@v4 persists its own credential in git config; a custom token
     # must override it or pushes silently keep riding GITHUB_TOKEN (which
@@ -123,11 +128,13 @@ runs:
     - name: Override push credential with token
       if: inputs.token != ''
       shell: bash
+      env:
+        INPUT_TOKEN: ${{ inputs.token }}
       run: |
         set -euo pipefail
         git config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         git config http.https://github.com/.extraheader \
-          "AUTHORIZATION: basic $(printf 'x-access-token:%s' "${{ inputs.token }}" | base64)"
+          "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$INPUT_TOKEN" | base64)"
 
     - name: Detect mode
       id: mode
@@ -159,7 +166,23 @@ runs:
         fi
 
         release_match=false
-        if [ "$INPUT_PUBLISH" = "true" ] && [ -f "$train" ]; then
+        train_touched=false
+        if [ -f "$train" ]; then
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            if git diff --name-only HEAD~1 HEAD 2>/dev/null \
+              | grep -qE '(^|/)\.changesets/\.pending-train\.json$'; then
+              train_touched=true
+            elif [ "$(git rev-list --parents -n 1 HEAD | wc -w)" -gt 2 ]; then
+              if git diff --name-only HEAD^1 HEAD 2>/dev/null \
+                | grep -qE '(^|/)\.changesets/\.pending-train\.json$'; then
+                train_touched=true
+              fi
+            fi
+          else
+            train_touched=true
+          fi
+        fi
+        if [ "$INPUT_PUBLISH" = "true" ] && [ -f "$train" ] && [ "$train_touched" = "true" ]; then
           if [[ "$head_msg" == "$COMMIT_PREFIX"* ]] || { [ -n "$pr_merge_sha" ] && [ "$pr_merge_sha" = "$head_sha" ]; }; then
             release_match=true
           fi
@@ -240,6 +263,7 @@ runs:
         GH_TOKEN: ${{ inputs.token || github.token }}
         PUBLISH_WORKFLOW: ${{ inputs.publish-workflow }}
         HAS_PAT: ${{ inputs.token != '' }}
+        MAJOR_REF: ${{ inputs.major-action-ref }}
       run: |
         set -euo pipefail
         merge_sha="$(git rev-parse HEAD)"
@@ -271,13 +295,6 @@ runs:
           fi
         done
 
-        major_ref='${{ inputs.major-action-ref }}'
-        if [ -n "$major_ref" ]; then
-          echo "== pin action ref $major_ref =="
-          git tag -f "$major_ref" "$merge_sha"
-          git push origin "$major_ref" --force
-        fi
-
         # Product tag + GitHub release: exactly once per train, idempotent.
         # The engine computes the tag and the notes (action stays thin).
         # Downstream builds must NOT be dispatched here — at merge time the
@@ -307,6 +324,27 @@ runs:
               --title "$ptag" \
               --notes-file product-notes.md
             rm -f product-notes.md
+          fi
+        fi
+
+        # Optional major action ref (engine repo only): after packages ship.
+        # Moving v1 across a new engine major can strand @v1 consumers — skip.
+        if [ -n "${MAJOR_REF:-}" ]; then
+          skip_pin=false
+          for tag in $(dart_changesets tags --plain); do
+            ver="${tag##*-v}"
+            major="${ver%%.*}"
+            if [ "$MAJOR_REF" = "v1" ] && [ "$major" != "1" ]; then
+              skip_pin=true
+              echo "::warning::skipping $MAJOR_REF pin — train includes $tag (major $major)"
+            fi
+          done
+          if [ "$skip_pin" = "false" ]; then
+            echo "== pin action ref $MAJOR_REF =="
+            git tag -f "$MAJOR_REF" "$merge_sha"
+            if ! git push origin "refs/tags/${MAJOR_REF}:refs/tags/${MAJOR_REF}" --force-with-lease 2>/dev/null; then
+              echo "::warning::could not move $MAJOR_REF (ref protected or workflows permission missing?)"
+            fi
           fi
         fi
 

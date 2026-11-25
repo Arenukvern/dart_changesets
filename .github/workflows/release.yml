@@ -33,6 +33,8 @@ jobs:
           # workflow_dispatch — its publish.yml is the reusable
           # workflow_call template).
           publish-workflow: self_publish.yml
+          # Move @v1 only in this repository (not consumer default).
+          major-action-ref: v1
           # Optional PAT (Contents: write): tag pushes start push-triggered
           # publish legs and version-PR branches run full CI. Unset →
           # GITHUB_TOKEN + workflow_dispatch on each package tag (enable

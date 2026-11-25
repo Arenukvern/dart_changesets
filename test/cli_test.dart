@@ -21,10 +21,11 @@ void main() {
       expect(result.stdout, 'dart_changesets $packageVersion\n');
     });
 
-    test('--help exits zero', () {
+    test('--help exits zero and lists commands', () {
       final result = runCli(const <String>['--help']);
       expect(result.exitCode, 0);
-      expect(result.stdout, contains('version'));
+      expect(result.stdout, contains('Commands:'));
+      expect(result.stdout, contains('publish-tag'));
     });
 
     test('missing command exits 64 without stack trace', () {

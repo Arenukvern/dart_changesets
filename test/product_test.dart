@@ -527,6 +527,71 @@ version_files:
       }
     });
 
+    test('ignores tags outside tag_format (e.g. v1.0.0)', () async {
+      final root = await gitFixtureRepo(
+        '0.3.0',
+        tags: <String>['v1.0.0', 'a-v0.2.0'],
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('allows prerelease pubspec ahead of release tag', () async {
+      final root = await gitFixtureRepo(
+        '1.0.0-dev.1',
+        tags: <String>['a-v0.9.0'],
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('allows build metadata ahead of release tag (+1)', () async {
+      final root = await gitFixtureRepo(
+        '1.0.0+1',
+        tags: <String>['a-v0.9.0'],
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('passes when git has no tags at all', () async {
+      final root = await gitFixtureRepo('1.0.0');
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
     test('first release (no tags) passes', () async {
       final root = Directory.systemTemp.createTempSync('dc_drift_fresh_');
       Directory('${root.path}/pkgs/new').createSync(recursive: true);
