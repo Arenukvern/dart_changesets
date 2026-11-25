@@ -49,6 +49,33 @@ dart test      # engine tests, including the cascade fixtures
   engine change you want shipped ships via an intent file in
   `.changesets/`.
 
+## Contributor credit
+
+The README contributor table is generated from
+[`.all-contributorsrc`](.all-contributorsrc) with
+[all-contributors](https://allcontributors.org/). After a merged contribution,
+comment on any open pull request (or ask a maintainer to):
+
+```text
+@all-contributors please add @<github-login> for code
+```
+
+Replace `code` with what actually happened — for example `doc`, `bug`,
+`userTesting`, `infra`, `security`, `research`, `maintenance`, or `tutorial`
+(see [emoji key](https://allcontributors.org/docs/en/emoji-key)). The bot opens
+a PR updating `.all-contributorsrc` and the README table; you can also run
+locally:
+
+```bash
+npx all-contributors-cli add <github-login> code,doc
+npx all-contributors-cli generate
+```
+
+Commit both `.all-contributorsrc` and `README.md`.
+
+Install the [all-contributors GitHub App](https://github.com/apps/allcontributors)
+on this repository if the bot is not already enabled.
+
 ## Pull requests
 
 One logical change per PR. CI runs `dart analyze` + `dart test` on every

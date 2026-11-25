@@ -1,8 +1,10 @@
+<div align="center">
+
+<!-- Logo: <img src="doc/assets/logo.svg" alt="dart_changesets logo" width="96" /> -->
+
 # dart_changesets
 
-A changesets-style release engine for Dart — **GitHub Action + Dart CLI** —
-that turns small intent files into version PRs and per-tag pub.dev publish
-trains.
+_A changesets-style release engine for Dart — **GitHub Action + Dart CLI** — that turns small intent files into version PRs and per-tag pub.dev publish trains._
 
 [![release train](https://github.com/Arenukvern/dart_changesets/actions/workflows/release.yml/badge.svg)](https://github.com/Arenukvern/dart_changesets/actions/workflows/release.yml)
 [![CI](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml/badge.svg)](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml)
@@ -10,6 +12,9 @@ trains.
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-dart__changesets-blue?logo=github)](https://github.com/marketplace/actions/dart_changesets)
 [![Dart SDK](https://img.shields.io/badge/Dart-%5E3.14.0-blue?logo=dart)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![All Contributors](https://img.shields.io/github/all-contributors/Arenukvern/dart_changesets?color=ee8449&style=flat-square)](https://github.com/Arenukvern/dart_changesets#contributors-)
+
+</div>
 
 ## Attribution
 
@@ -340,6 +345,36 @@ lives at the repository root; write an intent file to release it.
 never pushed). The next automated release will be **`1.0.0`** (`dart_changesets-v1.0.0`
 tag; major intent on this branch together with remaining pending changesets) with
 that changelog included.
+
+## ✨ Contributors
+
+Huge thanks to all contributors for making this project better!
+
+This roster is maintained with [all-contributors](https://allcontributors.org/).
+To add someone, update [`.all-contributorsrc`](.all-contributorsrc) and
+regenerate the README table, or comment on a pull request:
+
+`@all-contributors please add @<login> for code`
+
+More detail: [CONTRIBUTING.md](CONTRIBUTING.md#contributor-credit).
+
+<!-- https://allcontributors.org/docs/en/bot/usage -->
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://xsoulspace.dev"><img src="https://avatars.githubusercontent.com/u/15068151?v=4&size=100" width="100px" height="100px" alt="Anton Malofeev"/><br /><sub><b>Anton Malofeev</b></sub></a><br /><a href="https://github.com/Arenukvern/dart_changesets/commits?author=Arenukvern" title="Code">💻</a> <a href="https://github.com/Arenukvern/dart_changesets/commits?author=Arenukvern" title="Documentation">📖</a> <a href="#maintenance-Arenukvern" title="Maintenance">🚧</a> <a href="#infra-Arenukvern" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 ## Contributing & community
 
