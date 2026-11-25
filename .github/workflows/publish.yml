@@ -26,7 +26,7 @@ on:
         type: boolean
         default: true
       engine-ref:
-        description: 'Engine ref to install (defaults to this repo default branch)'
+        description: 'Engine ref to install (defaults to this workflow file’s commit)'
         required: false
         type: string
         default: ''
@@ -87,23 +87,43 @@ jobs:
     timeout-minutes: 30
     steps:
       # Checks out the CALLER repository when invoked via workflow_call.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dart-lang/setup-dart@v1
 
       - name: Install engine
+        env:
+          ENGINE_REF: ${{ inputs.engine-ref }}
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          JOB_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
         run: |
-          ref="${{ inputs.engine-ref }}"
-          if [ -z "$ref" ]; then ref="${GITHUB_ACTION_REF:-main}"; fi
+          set -euo pipefail
+          ref="${ENGINE_REF}"
+          repo="${JOB_WORKFLOW_REPOSITORY:-Arenukvern/dart_changesets}"
+          if [ -z "$ref" ]; then
+            if [ -n "${JOB_WORKFLOW_SHA:-}" ]; then
+              ref="${JOB_WORKFLOW_SHA}"
+            else
+              echo "::warning::job.workflow_sha unavailable — installing engine from main"
+              ref="main"
+            fi
+          fi
+          if [ -z "${JOB_WORKFLOW_REPOSITORY:-}" ]; then
+            echo "::warning::job.workflow_repository unavailable — defaulting repo to Arenukvern/dart_changesets"
+            repo="Arenukvern/dart_changesets"
+          fi
+          echo "engine: ${repo} @ ${ref}"
           dart pub global activate --source git \
-            "https://github.com/${GITHUB_ACTION_REPOSITORY:-Arenukvern/dart_changesets}.git" \
-            --git-ref "$ref"
+            "https://github.com/${repo}.git" --git-ref "$ref"
 
       - name: Detect package runner (engine knows the layout)
         id: runner
         working-directory: ${{ inputs.cwd }}
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          runner="$(dart_changesets runner --tag "${{ inputs.tag }}")"
+          set -euo pipefail
+          runner="$(dart_changesets runner --tag "$INPUT_TAG")"
           echo "runner=$runner" >> "$GITHUB_OUTPUT"
 
       # The Flutter SDK is installed ONLY when the workspace needs it:
@@ -122,14 +142,20 @@ jobs:
 
       - name: Publish this tag's package
         working-directory: ${{ inputs.cwd }}
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_EXECUTE: ${{ inputs.execute }}
+          INPUT_SKIP_GATE: ${{ inputs.skip-dependency-gate }}
+          INPUT_WAIT: ${{ inputs.dependency-wait-minutes }}
         run: |
+          set -euo pipefail
           execute_flag=""
-          if [ "${{ inputs.execute }}" = "true" ]; then execute_flag="--execute"; fi
+          if [ "$INPUT_EXECUTE" = "true" ]; then execute_flag="--execute"; fi
           gate_flag=""
-          if [ "${{ inputs.skip-dependency-gate }}" = "true" ]; then gate_flag="--skip-dependency-gate"; fi
+          if [ "$INPUT_SKIP_GATE" = "true" ]; then gate_flag="--skip-dependency-gate"; fi
           dart_changesets publish-tag \
-            --tag "${{ inputs.tag }}" $execute_flag --skip-existing $gate_flag \
-            --dependency-wait-minutes "${{ inputs.dependency-wait-minutes }}"
+            --tag "$INPUT_TAG" $execute_flag --skip-existing $gate_flag \
+            --dependency-wait-minutes "$INPUT_WAIT"
 
       # Fires only for the product package's tag and only after the publish
       # succeeded — a GITHUB_TOKEN tag push fires no push workflows, so this
@@ -138,12 +164,21 @@ jobs:
         if: inputs.product-dispatch-workflow != '' && inputs.execute
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+          PRODUCT_WORKFLOW: ${{ inputs.product-dispatch-workflow }}
+          PRODUCT_INPUT: ${{ inputs.product-dispatch-input }}
+          DISPATCH_REF: ${{ github.ref_name }}
         run: |
-          ptag="$(dart_changesets product-release --tag "${{ inputs.tag }}")"
+          set -euo pipefail
+          ptag="$(dart_changesets product-release --tag "$INPUT_TAG")"
           if [ -z "$ptag" ]; then
             echo "not the product tag; nothing to dispatch"
             exit 0
           fi
-          gh workflow run "${{ inputs.product-dispatch-workflow }}" \
-            --ref "${{ github.ref_name }}" \
-            -f "${{ inputs.product-dispatch-input }}=$ptag"
+          dispatch_ref="$DISPATCH_REF"
+          if git rev-parse -q --verify "refs/tags/$ptag" >/dev/null 2>&1; then
+            dispatch_ref="$ptag"
+          fi
+          gh workflow run "$PRODUCT_WORKFLOW" \
+            --ref "$dispatch_ref" \
+            -f "${PRODUCT_INPUT}=$ptag"

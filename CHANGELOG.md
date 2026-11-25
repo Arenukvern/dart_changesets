@@ -2,6 +2,11 @@
 
 ## 0.3.0
 
+> **Never published to pub.dev** — the version-PR merged on 2026-11-24, then
+> assemble on the next push hit the drift guard (pubspec ahead of tags, exit 65)
+> before release mode could push tags. Changelog entries below ship with the
+> next release (**1.0.0**; major intent on the OSS-readiness train).
+
 ### Minor Changes
 
 - **Changelog comment banners stay above the new version section.**

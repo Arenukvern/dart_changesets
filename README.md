@@ -4,6 +4,7 @@ A changesets-style release engine for Dart — **GitHub Action + Dart CLI** —
 that turns small intent files into version PRs and per-tag pub.dev publish
 trains.
 
+[![release train](https://github.com/Arenukvern/dart_changesets/actions/workflows/release.yml/badge.svg)](https://github.com/Arenukvern/dart_changesets/actions/workflows/release.yml)
 [![CI](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml/badge.svg)](https://github.com/Arenukvern/dart_changesets/actions/workflows/ci.yml)
 [![pub: dart_changesets](https://img.shields.io/pub/v/dart_changesets.svg)](https://pub.dev/packages/dart_changesets)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-dart__changesets-blue?logo=github)](https://github.com/marketplace/actions/dart_changesets)
@@ -28,9 +29,19 @@ The action is published on the
 [GitHub Marketplace](https://github.com/marketplace/actions/dart_changesets) —
 pin `@v1` for the current major.
 
-1. **Two workflow files** (copy from [example/consumer-workflows](example/consumer-workflows)):
-   `release.yml` (push to main) and `publish.yml` (per-tag pub.dev publish).
-2. **Write an intent file** inside any PR:
+**Before the first train:**
+
+1. GitHub **Settings → Actions → General → Workflow permissions** → enable
+   **Allow GitHub Actions to create and approve pull requests** (version PRs).
+2. pub.dev **package → Admin → Automated publishing** → repository + tag pattern;
+   if you publish without a PAT, also enable **Enable publishing from
+   workflow_dispatch events** (`repository_dispatch` is rejected). Tag push
+   events do not need that toggle.
+
+3. **Two workflow files** (copy from [example/consumer-workflows](example/consumer-workflows)):
+   `release.yml` (push to main; `actions/checkout` needs `fetch-depth: 0`) and
+   `publish.yml` (per-tag pub.dev publish).
+4. **Write an intent file** inside any PR:
 
    ```markdown
    ---
@@ -40,20 +51,13 @@ pin `@v1` for the current major.
    What changed, as changelog prose.
    ```
 
-3. **Merge to main** → the action opens a `chore: version packages` PR
+5. **Merge to main** → the action opens a `chore: version packages` PR
    (version bumps + dependent-constraint cascades + changelogs).
-4. **Merge that PR** → one `<package>-v<version>` tag per release, one
+6. **Merge that PR** → one `<package>-v<version>` tag per release, one
    publish run per tag, ordered by dependency waits.
 
 No conventional-commit discipline is required — release intent lives in
 reviewed files, not commit messages.
-
-**One required repo setting** (GitHub default blocks bot-made PRs):
-Settings → Actions → General → Workflow permissions → check
-**Allow GitHub Actions to create and approve pull requests**. The version
-PR is created by `GITHUB_TOKEN`; with the setting off, assemble runs push
-the version branch but cannot open the PR (and the next assemble run
-repairs it once the setting is on).
 
 **Required workflow permissions** in your release workflow: `contents:
 write`, `pull-requests: write`, and `actions: write` — the last one
@@ -64,17 +68,21 @@ RUN (a re-run checks out the original merge ref, so release mode
 detects again; a fresh dispatch on a moved main head correctly does
 nothing), or by dispatching the publish workflow per tag.
 
-### pub.dev authorization: the token input is what enables publishing
+### pub.dev authorization: PAT optional, tag ref required
 
-pub.dev's automated publishing authorizes ONLY workflows triggered by a
-**tag push** — `workflow_dispatch` runs are rejected for real publishes
-([dart.dev/go/publishing-from-github](https://dart.dev/go/publishing-from-github)).
-And `GITHUB_TOKEN` tag pushes fire no workflows. Together: **automated
-publishing requires a PAT via the action's `token` input** (Contents:
-write), so the tag pushes the action makes START your push-triggered
-publish workflow with a pub.dev-authorized `push` event. This is the
-same role the release-please PAT played — repositories migrating from
-release-please already have it as the `RELEASE_PLEASE_TOKEN` secret:
+pub.dev always authorizes publishes when the workflow run is tied to a
+**package tag ref** (`refType == tag`). A `workflow_dispatch` run on the
+tag ref is allowed when the package admin enables **Enable publishing from
+workflow_dispatch events** on pub.dev (Admin → Automated publishing). Tag
+**push** events are always allowed once automated publishing is configured.
+
+`GITHUB_TOKEN` tag pushes do not start other workflows, so the default
+(no `token` input) path dispatches your `publish.yml` once per tag with
+`--ref <package>-v<version>` and `execute=true`. Optional PAT
+(`token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`, Contents: write) makes tag
+pushes start push-triggered publish legs instead — useful when you do not
+enable workflow_dispatch on pub.dev, or when you want version-PR branch
+pushes to run full CI:
 
 ```yaml
 - uses: Arenukvern/dart_changesets@v1
@@ -83,12 +91,8 @@ release-please already have it as the `RELEASE_PLEASE_TOKEN` secret:
   env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
 ```
 
-Without it the train still assembles, tags, and runs preflight dry-runs
-per tag — but stops before publishing. Also required per package
-(owner-paced, web session): pub.dev package Admin → Automated publishing
-→ repository + tag pattern. Rescue for a tag that already exists: delete
-it and push it again with the PAT (the push event is what pub.dev
-authorizes); skip-existing keeps re-runs idempotent.
+Per package (owner-paced, web session): pub.dev → Admin → Automated
+publishing → repository + tag pattern matching `tag_format`.
 
 **No GitHub Actions `environment` is declared anywhere in this workflow — by
 design** (dart-lang/core publishes the same way). The token's repository +
@@ -109,16 +113,16 @@ Two optional README badges for consumer repositories — train health and
 attribution:
 
 ```markdown
-[![release train](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/dart_changesets.yml?branch=main&label=release%20train&logo=github)](https://github.com/OWNER/REPO/actions/workflows/dart_changesets.yml)
+[![release train](https://img.shields.io/github/actions/workflow/status/OWNER/REPO/release.yml?branch=main&label=release%20train&logo=github)](https://github.com/OWNER/REPO/actions/workflows/release.yml)
 [![release engine: dart_changesets](https://img.shields.io/badge/release_engine-dart__changesets-0175C2?logo=dart&logoColor=white)](https://github.com/Arenukvern/dart_changesets)
 ```
 
-- The **release train** badge mirrors your `dart_changesets.yml` (release
-  workflow) latest run on the default branch. Red is the first visible
-  signal the train broke — most often the workflow-permission setting above.
+- The **release train** badge mirrors your `release.yml` (release workflow)
+  latest run on the default branch. Red is the first visible signal the train
+  broke — most often the workflow-permission setting above.
 - The **release engine** badge is static attribution to this repository.
 - If a repo avoids third-party image hosts, GitHub's native badge also works:
-  `https://github.com/OWNER/REPO/actions/workflows/dart_changesets.yml/badge.svg`
+  `https://github.com/OWNER/REPO/actions/workflows/release.yml/badge.svg`
   (it shows the workflow's own display name).
 
 Live example: [flutter-mcp-toolkit](https://github.com/Arenukvern/mcp_flutter)
@@ -130,6 +134,17 @@ carries both in its README badge row.
 # The whole main-side wiring in a consumer repo:
 - uses: Arenukvern/dart_changesets@v1
   env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+  # permissions on the job: contents + pull-requests + actions: write
+```
+
+```mermaid
+flowchart LR
+  intents[".changesets/*.md in PRs"] --> assemble["assemble on push to main"]
+  assemble --> vpr["version PR"]
+  vpr --> merge["merge version PR"]
+  merge --> tags["one tag per package"]
+  tags --> publish["publish workflow per tag"]
+  publish --> pubdev["pub.dev OIDC"]
 ```
 
 - **Assemble mode**: pending `.changesets/*.md` intent files → the engine
@@ -154,35 +169,59 @@ carries both in its README badge row.
   per-tag runs converge on a train without manual re-dispatches) → strict
   dry-run → `pub publish --force` (OIDC) → wait for pub.dev visibility.
 
+## Repository setup
+
+| Layout | `changesets.yaml` |
+| --- | --- |
+| **Single package** at repo root | `root_package: true` (or omit `packages_dir` / `pkgs` — the engine discovers the root pubspec) |
+| **Monorepo** (`pkgs/*` or `packages/*`) | default `packages_dir: pkgs`; uses `packages/` when `pkgs/` is absent |
+| **Dart pub workspace** | `workspace:` in root `pubspec.yaml` (preferred; globs supported) |
+
 ## Configuration
 
 `changesets.yaml` at the repository root (all keys optional):
 
+| Key | Default | Purpose |
+| --- | --- | --- |
+| `packages_dir` | `pkgs` | One-level scan when no `workspace:` declaration |
+| `root_package` | `false` | Include the repository root `pubspec.yaml` as a package |
+| `dependent_bump` | `patch` | Bump for publishable dependents with rewritten constraints (`patch` or `minor`) |
+| `ignore` | `[]` | Package names never released (in addition to `publish_to: none`) |
+| `tag_format` | `{package}-v{version}` | Per-package release tags (match pub.dev tag pattern) |
+| `product_tag` | — | One package that also gets a product-shaped tag + GitHub release at merge |
+| `version_files` | — | Non-pubspec version strings bumped with each release |
+
+Example:
+
 ```yaml
-packages_dir: pkgs          # where packages live (default: pkgs)
-root_package: false         # single-package repos: include the root pubspec
-dependent_bump: patch       # bump applied to dependents whose constraint changed
+packages_dir: pkgs
+root_package: false
+dependent_bump: patch
+ignore:
+  - internal_tools
 tag_format: '{package}-v{version}'
-
-# Optional: one package whose release ALSO gets a product tag + GitHub
-# release at the version-PR merge commit (exactly once per train, idempotent).
 product_tag:
-  package: flutter_mcp_toolkit_server   # pubspec `name:`, not the directory
+  package: my_app
   format: 'v{version}'
-
-# Optional: version strings outside pubspec that move with a package's
-# release. Missing files, drifted versions, and ambiguous patterns fail
-# loudly — never touch unrelated occurrences.
 version_files:
-  flutter_mcp_toolkit_server:
+  my_app:
     - path: VERSION
       pattern: '{version}'
-    - path: mcp_server_dart/server.json
-      pattern: '"version": "{version}"'
 ```
 
 Packages marked `publish_to: none` are private automatically and never
 released; the doctor gate fails when a publishable package depends on one.
+
+### CLI commands beyond `version`
+
+- `dart_changesets product-release` — release mode prints `tag=`, `package=`,
+  `version=` for GitHub releases; publish mode maps a package tag to the
+  product tag for downstream dispatch.
+- `dart_changesets release-notes --package NAME --version X.Y.Z` — changelog
+  section text for GitHub release bodies.
+
+Workspace discovery order: root `workspace:` list → `packages_dir` (with
+`packages/` fallback) → implicit root pubspec when no package directory exists.
 
 ### Product tag → GitHub release → binaries
 
@@ -256,11 +295,51 @@ pub.dev cannot automate a package's first release:
 New-package rate limit is ~12/day (4 in a burst) — spread first publishes
 across days.
 
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| Version PR branch pushed, no PR opened | **Allow GitHub Actions to create and approve pull requests** off | Settings → Actions → General → Workflow permissions |
+| Tags pushed, publish never runs | Missing `actions: write` on the release job | Add to `permissions:` in `release.yml`; re-run failed release or dispatch `publish.yml` per tag |
+| Version-PR CI does not run | Pushes use `GITHUB_TOKEN` | Optional PAT via `token:` input |
+| `gh pr edit` / GraphQL scope errors on assemble | PAT missing `read:org` (only affects legacy paths) | Upstream action uses REST `PATCH pulls`; update `@v1` |
+| Publish waits then times out | Dependency floor not visible on pub.dev yet | Wait or raise `dependency-wait-minutes`; recovery: `skip-dependency-gate` |
+| Tag exists, version still on pub.dev old | First publish or failed leg | First publish is always manual; re-dispatch publish with skip-existing |
+| `FAIL: release drift detected` | Pubspec **behind** a release tag (out of sync with pub.dev) | Restore pubspec to ≥ tagged version, or fix mistaken tags. Pubspec **ahead** of tags (unreleased merge) is OK — the next train bumps from the pubspec |
+
+## Action ref (`@v1`) and engine install
+
+Consumers pin `Arenukvern/dart_changesets@v1`. The composite action installs
+the CLI from **`GITHUB_ACTION_PATH`** (the checked-out action tree), not from
+the consumer’s `GITHUB_SHA`.
+
+Reusable `publish.yml` installs from **`job.workflow_sha`** / **`job.workflow_repository`**
+in the called workflow repository (`github.job` is the **current job’s id string**, e.g.
+`publish`, not the caller or workflow ref — do not use for engine install).
+Unavailable on GHES → warning and `main` fallback. Override with `engine-ref`
+when pinning a specific tag. Checkout must use **`fetch-depth: 0`** so release
+mode can read tags and train history.
+
+Only this repository sets `major-action-ref: v1` on self-release to move the
+`v1` pointer after each version-PR merge (`git ls-remote` + `--force-with-lease`
+on the tag ref). That step is **warn-only** on failure. The default
+`GITHUB_TOKEN` cannot receive `workflows: write` — use a **PAT or GitHub App
+token** with `workflows` permission when tag moves must succeed across commits
+that touch workflow files.
+
+When `product_tag` is configured, the merge can also create product-shaped tags
+and GitHub releases — optional for consumers.
+
 ## This repository releases itself
 
 The action and the reusable publish workflow run this repo's own train
 (`.github/workflows/release.yml` + `self_publish.yml`). The engine package
 lives at the repository root; write an intent file to release it.
+
+**Note:** Version **0.3.0** merged to `main` but never shipped to pub.dev (tags
+never pushed). The next automated release will be **`1.0.0`** (`dart_changesets-v1.0.0`
+tag; major intent on this branch together with remaining pending changesets) with
+that changelog included.
 
 ## Contributing & community
 

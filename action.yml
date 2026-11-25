@@ -22,8 +22,8 @@
 #     release:
 #       runs-on: ubuntu-latest
 #       steps:
-#         - uses: actions/checkout@v4
-#           with: { fetch-depth: 0 }
+#         - uses: actions/checkout@v5
+#           with: { fetch-depth: 0 }  # full history for tags + version-PR merge detection
 #         - uses: Arenukvern/dart_changesets@v1
 #           env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
 #
@@ -83,12 +83,18 @@ inputs:
     default: 'publish.yml'
   token:
     description: >
-      Token used for every branch push, PR create/edit, tag push, release
-      creation and workflow dispatch. Defaults to github.token. A PAT (or
-      App token) makes the version PR run full CI: pushes made with
-      GITHUB_TOKEN trigger no workflows. Note that actions/checkout
-      persists its own credential in git config — when a custom token is
-      set, the action overrides that credential before pushing.
+      Optional PAT (Contents: write) for branch pushes, tag pushes, PR
+      updates, and release creation. When set, tag pushes also start
+      push-triggered publish workflows (GITHUB_TOKEN tag pushes fire no
+      workflows). When unset, the action uses GITHUB_TOKEN and dispatches
+      publish runs on each package tag ref — enable "Publishing from
+      workflow_dispatch" on pub.dev for OIDC publishes without a PAT.
+    required: false
+    default: ''
+  major-action-ref:
+    description: >
+      On release, move this git ref to the version-PR merge commit (e.g. v1
+      for the engine repo). Empty disables — consumers should leave unset.
     required: false
     default: ''
 
@@ -105,11 +111,16 @@ runs:
         INPUT_ENGINE_REF: ${{ inputs.engine-ref }}
       run: |
         set -euo pipefail
-        repo="${INPUT_ENGINE_REPO:-${GITHUB_ACTION_REPOSITORY:-Arenukvern/dart_changesets}}"
-        ref="${INPUT_ENGINE_REF:-${GITHUB_ACTION_REF:-main}}"
-        echo "engine: $repo @ $ref"
-        dart pub global activate --source git \
-          "https://github.com/${repo}.git" --git-ref "$ref"
+        if [ -n "$INPUT_ENGINE_REF" ] || [ -n "$INPUT_ENGINE_REPO" ]; then
+          repo="${INPUT_ENGINE_REPO:-Arenukvern/dart_changesets}"
+          ref="${INPUT_ENGINE_REF:-main}"
+          echo "engine: $repo @ $ref (git)"
+          dart pub global activate --source git \
+            "https://github.com/${repo}.git" --git-ref "$ref"
+        else
+          echo "engine: ${GITHUB_ACTION_PATH} (path)"
+          dart pub global activate --source path "$GITHUB_ACTION_PATH"
+        fi
 
     # checkout@v4 persists its own credential in git config; a custom token
     # must override it or pushes silently keep riding GITHUB_TOKEN (which
@@ -117,11 +128,13 @@ runs:
     - name: Override push credential with token
       if: inputs.token != ''
       shell: bash
+      env:
+        INPUT_TOKEN: ${{ inputs.token }}
       run: |
         set -euo pipefail
         git config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         git config http.https://github.com/.extraheader \
-          "AUTHORIZATION: basic $(printf 'x-access-token:%s' "${{ inputs.token }}" | base64)"
+          "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$INPUT_TOKEN" | base64)"
 
     - name: Detect mode
       id: mode
@@ -152,10 +165,29 @@ runs:
             --jq 'select(.state == "MERGED") | .mergeCommit.oid' 2>/dev/null || true)"
         fi
 
-        if [ "$pending" -gt 0 ]; then
-          echo "result=assemble" >> "$GITHUB_OUTPUT"
-        elif [ "$INPUT_PUBLISH" = "true" ] && [ -f "$train" ] && { [[ "$head_msg" == "$COMMIT_PREFIX"* ]] || { [ -n "$pr_merge_sha" ] && [ "$pr_merge_sha" = "$head_sha" ]; }; }; then
+        release_match=false
+        train_touched=false
+        if [ -f "$train" ]; then
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            if git diff --name-only HEAD~1 HEAD 2>/dev/null \
+              | grep -qE '(^|/)\.changesets/\.pending-train\.json$'; then
+              train_touched=true
+            fi
+          else
+            train_touched=true
+          fi
+        fi
+        if [ "$INPUT_PUBLISH" = "true" ] && [ -f "$train" ] && [ "$train_touched" = "true" ]; then
+          if [[ "$head_msg" == "$COMMIT_PREFIX"* ]] || { [ -n "$pr_merge_sha" ] && [ "$pr_merge_sha" = "$head_sha" ]; }; then
+            release_match=true
+          fi
+        fi
+        # Release mode wins over assemble: new intent files can land on main
+        # while a version PR is open — merging that PR must still push tags.
+        if [ "$release_match" = "true" ]; then
           echo "result=release" >> "$GITHUB_OUTPUT"
+        elif [ "$pending" -gt 0 ]; then
+          echo "result=assemble" >> "$GITHUB_OUTPUT"
         else
           echo "result=none" >> "$GITHUB_OUTPUT"
         fi
@@ -188,6 +220,7 @@ runs:
         else
           git checkout -B "$BRANCH"
         fi
+        ahead_warnings="$(dart_changesets pubspec-ahead-warnings 2>/dev/null || true)"
         dart_changesets version
         if git diff --quiet && git diff --cached --quiet; then
           echo "No file changes after apply — the version branch is current."
@@ -207,8 +240,13 @@ runs:
         else
           body="Release train"
         fi
+        if [ -n "$ahead_warnings" ]; then
+          body="${body}"$'\n\n'"### Unreleased pubspec versions"$'\n'"${ahead_warnings}"
+        fi
         if [ "$pr_state" = "OPEN" ]; then
-          gh pr edit "$BRANCH" --body "Release train:"$'\n'"$body"
+          pr_number="$(gh pr view "$BRANCH" --json number --jq .number)"
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" \
+            -f body="Release train:"$'\n'"$body"
         else
           gh pr create --base main --head "$BRANCH" \
             --title "$TITLE" \
@@ -224,6 +262,7 @@ runs:
         GH_TOKEN: ${{ inputs.token || github.token }}
         PUBLISH_WORKFLOW: ${{ inputs.publish-workflow }}
         HAS_PAT: ${{ inputs.token != '' }}
+        MAJOR_REF: ${{ inputs.major-action-ref }}
       run: |
         set -euo pipefail
         merge_sha="$(git rev-parse HEAD)"
@@ -238,20 +277,20 @@ runs:
             git tag "$tag" "$merge_sha"
             git push origin "$tag"
           fi
-          # pub.dev's automated publishing authorizes ONLY tag-push events —
-          # a workflow_dispatch run is rejected for real publishes
-          # (dart.dev/go/publishing-from-github). And GITHUB_TOKEN tag
-          # pushes fire no workflows. Together: real publishing requires
-          # the token input (a PAT) so the pushes above START the
-          # consumer's push-triggered publish workflow themselves.
+          # PAT path: tag push starts the consumer's push-triggered publish
+          # workflow (pub.dev always allows tag-push OIDC).
+          # GITHUB_TOKEN path: tag push fires nothing — dispatch on the TAG
+          # ref so pub.dev sees refType=tag. Requires pub.dev Admin →
+          # "Enable publishing from workflow_dispatch events" when not using
+          # a PAT.
           if [ "$HAS_PAT" = "true" ]; then
-            echo "token input set: the push above fires the publish workflow (push event — pub.dev-authorized); no dispatch."
+            echo "token input set: tag push fires the publish workflow (push event); no dispatch."
           else
-            echo "no token input (GITHUB_TOKEN): the push fired nothing; dispatching a PREFLIGHT run (execute=false). pub.dev rejects workflow_dispatch publishes — provide a PAT via the token input for real publishes."
+            echo "dispatching publish on ref $tag (workflow_dispatch; enable on pub.dev when not using a PAT)."
             gh workflow run "$PUBLISH_WORKFLOW" \
-              --ref "$GITHUB_REF_NAME" \
+              --ref "$tag" \
               -f tag="$tag" \
-              -f execute=false
+              -f execute=true
           fi
         done
 
@@ -284,6 +323,38 @@ runs:
               --title "$ptag" \
               --notes-file product-notes.md
             rm -f product-notes.md
+          fi
+        fi
+
+        # Optional major action ref (engine repo only): after packages ship.
+        # Moving v1 across a new engine major can strand @v1 consumers — skip.
+        if [ -n "${MAJOR_REF:-}" ]; then
+          skip_pin=false
+          for tag in $(dart_changesets tags --plain); do
+            ver="${tag##*-v}"
+            major="${ver%%.*}"
+            if [ "$MAJOR_REF" = "v1" ] && [ "$major" != "1" ]; then
+              skip_pin=true
+              echo "::warning::skipping $MAJOR_REF pin — train includes $tag (major $major)"
+            fi
+          done
+          if [ "$skip_pin" = "false" ]; then
+            echo "== pin action ref $MAJOR_REF =="
+            old_sha="$(git ls-remote origin "refs/tags/${MAJOR_REF}" | awk '{print $1}')"
+            git tag -f "$MAJOR_REF" "$merge_sha"
+            if [ -n "$old_sha" ]; then
+              if ! git push origin \
+                "refs/tags/${MAJOR_REF}:refs/tags/${MAJOR_REF}" \
+                --force-with-lease="refs/tags/${MAJOR_REF}:${old_sha}"; then
+                echo "::warning::could not move $MAJOR_REF (stale lease, ref protected, or missing workflows permission on token)"
+              fi
+            else
+              if ! git push origin \
+                "refs/tags/${MAJOR_REF}:refs/tags/${MAJOR_REF}" \
+                --force-with-lease="refs/tags/${MAJOR_REF}:"; then
+                echo "::warning::could not create $MAJOR_REF"
+              fi
+            fi
           fi
         fi
 

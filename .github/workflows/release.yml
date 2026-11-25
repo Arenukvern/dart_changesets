@@ -22,7 +22,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -33,13 +33,12 @@ jobs:
           # workflow_dispatch — its publish.yml is the reusable
           # workflow_call template).
           publish-workflow: self_publish.yml
-          # pub.dev authorizes automated publishing ONLY from tag-push
-          # events, and GITHUB_TOKEN pushes fire no workflows — so real
-          # publishes need a PAT here (unset → falls back to GITHUB_TOKEN
-          # and trains stop at preflight). This is the same role the
-          # release-please PAT played: reuse your existing
-          # RELEASE_PLEASE_TOKEN secret (Contents: write). It also makes
-          # version-PR pushes run full CI.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          # Move @v1 only in this repository (not consumer default).
+          major-action-ref: v1
+          # Optional PAT (Contents: write): tag pushes start push-triggered
+          # publish legs and version-PR branches run full CI. Unset →
+          # GITHUB_TOKEN + workflow_dispatch on each package tag (enable
+          # pub.dev Admin → workflow_dispatch publishing for OIDC).
+          # token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

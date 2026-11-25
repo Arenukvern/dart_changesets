@@ -276,5 +276,38 @@ workspace:
         teardownRepo(root);
       }
     });
+
+    test('falls back to packages/ when pkgs/ is missing', () async {
+      final root = Directory.systemTemp.createTempSync('dcg_packages_dir_');
+      Directory('${root.path}/packages/pkg_a').createSync(recursive: true);
+      File('${root.path}/packages/pkg_a/pubspec.yaml').writeAsStringSync(
+        'name: pkg_a\nversion: 1.0.0\n',
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(),
+        );
+        expect(graph.packages['pkg_a']!.publishable, isTrue);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('discovers root pubspec when no packages directory exists', () async {
+      final root = Directory.systemTemp.createTempSync('dcg_root_auto_');
+      File('${root.path}/pubspec.yaml').writeAsStringSync(
+        'name: rootpkg\nversion: 2.0.0\n',
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(),
+        );
+        expect(graph.packages['rootpkg']!.publishable, isTrue);
+      } finally {
+        teardownRepo(root);
+      }
+    });
   });
 }

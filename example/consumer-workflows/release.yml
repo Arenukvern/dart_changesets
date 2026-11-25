@@ -24,21 +24,20 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - uses: Arenukvern/dart_changesets@v1
+        with:
+          # Optional PAT (Contents: write) so tag pushes start your
+          # push-triggered publish workflow and version-PR CI runs. Without
+          # it the action dispatches publish on each tag ref via
+          # workflow_dispatch — enable that on pub.dev Admin for OIDC
+          # publishes, or set this to your RELEASE_PLEASE_TOKEN secret.
+          # token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # REQUIRED for real pub.dev publishes: pub.dev authorizes automated
-        # publishing only from tag-push events, and GITHUB_TOKEN tag pushes
-        # fire no workflows — a PAT (Contents: write) makes the tag pushes
-        # above start your push-triggered publish workflow. Unset → the
-        # train runs preflight-only and stops. Repos migrating from
-        # release-please already have this secret: RELEASE_PLEASE_TOKEN
-        # played exactly this role there.
-        #   token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         # Optional inputs (defaults shown):
         #   branch: changesets/version-packages
         #   commit: chore: version packages

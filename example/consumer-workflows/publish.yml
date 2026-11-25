@@ -43,5 +43,6 @@ jobs:
       # configured under product_tag in changesets.yaml:
       # product-dispatch-workflow: release.yml
       # product-dispatch-input: release_tag
-      # Optional: pin the engine ref (defaults to the action's own ref).
+      # Optional: pin the engine ref (default: job.workflow_sha of the called
+      # reusable workflow in Arenukvern/dart_changesets — not github.workflow_sha).
       # engine-ref: v1

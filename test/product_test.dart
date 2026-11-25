@@ -484,7 +484,7 @@ version_files:
           config: const ChangesetsConfig(packagesDir: 'pkgs'),
         );
 
-    test('flags a pubspec ahead of its newest release tag', () async {
+    test('allows pubspec ahead of its newest release tag', () async {
       final root = await gitFixtureRepo('1.1.0', tags: <String>['a-v1.0.0']);
       try {
         final graph = await WorkspaceGraph.load(
@@ -492,8 +492,22 @@ version_files:
           const ChangesetsConfig(packagesDir: 'pkgs'),
         );
         final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('flags a pubspec behind its newest release tag', () async {
+      final root = await gitFixtureRepo('1.0.0', tags: <String>['a-v1.2.0']);
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
         expect(problems, hasLength(1));
-        expect(problems.single, contains('newest release tag (1.0.0)'));
+        expect(problems.single, contains('behind the newest release tag'));
       } finally {
         teardownRepo(root);
       }
@@ -501,6 +515,57 @@ version_files:
 
     test('passes when the pubspec matches the newest tag', () async {
       final root = await gitFixtureRepo('1.2.3', tags: <String>['a-v1.2.3']);
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('ignores tags outside tag_format (e.g. v1.0.0)', () async {
+      final root = await gitFixtureRepo(
+        '0.3.0',
+        tags: <String>['v1.0.0', 'a-v0.2.0'],
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('allows prerelease pubspec ahead of release tag', () async {
+      final root = await gitFixtureRepo(
+        '1.0.0-dev.1',
+        tags: <String>['a-v0.9.0'],
+      );
+      try {
+        final graph = await WorkspaceGraph.load(
+          root.path,
+          const ChangesetsConfig(packagesDir: 'pkgs'),
+        );
+        final problems = await drift(root, graph);
+        expect(problems, isEmpty);
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
+    test('allows build metadata ahead of release tag (+1)', () async {
+      final root = await gitFixtureRepo(
+        '1.0.0+1',
+        tags: <String>['a-v0.9.0'],
+      );
       try {
         final graph = await WorkspaceGraph.load(
           root.path,

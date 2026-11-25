@@ -11,7 +11,17 @@ const configFileName = 'changesets.yaml';
 
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
-    ..addCommand('add')
+    ..addFlag('help', abbr: 'h', negatable: false, help: 'Print this usage.')
+    ..addFlag('version', negatable: false, help: 'Print the package version.')
+    ..addCommand(
+      'add',
+      ArgParser()
+        ..addFlag('help', abbr: 'h', negatable: false, help: 'Usage for add.')
+        ..addOption('package', abbr: 'p', help: 'Package name (non-interactive).')
+        ..addOption('bump', abbr: 'b', help: 'major, minor, or patch.')
+        ..addOption('message', abbr: 'm', help: 'Changelog summary (one line).'),
+    )
+    ..addCommand('pubspec-ahead-warnings')
     ..addCommand('status')
     ..addCommand(
       'version',
@@ -70,64 +80,121 @@ Future<void> main(List<String> arguments) async {
   try {
     args = parser.parse(arguments);
   } on ArgParserException catch (e) {
-    stderr.writeln('dart_changesets: ${e.message}\n\n${parser.usage}');
+    stderr.writeln('dart_changesets: ${e.message}');
+    stderr.writeln('');
+    stderr.writeln('');
+    _printUsage(parser);
     exit(64);
   }
 
-  final repoRoot = findRepoRoot();
-  if (repoRoot == null) {
-    stderr.writeln(
-      'dart_changesets: no repository root found (looking for '
-      '$configFileName or a $changesetsDirName directory upward).',
+  if (args.wasParsed('help') && args['help'] as bool) {
+    _printUsage(parser);
+    exit(0);
+  }
+  if (args.wasParsed('version') && args['version'] as bool) {
+    stdout.writeln('dart_changesets $packageVersion');
+    exit(0);
+  }
+  final command = args.command;
+  if (command != null &&
+      command.options.contains('help') &&
+      command.wasParsed('help') &&
+      command['help'] == true) {
+    stdout.writeln(parser.commands[command.name]!.usage);
+    exit(0);
+  }
+  if (command == null) {
+    stderr.writeln('dart_changesets: command required');
+    stderr.writeln('');
+    _printUsage(parser);
+    exit(64);
+  }
+
+  try {
+    final repoRoot = findRepoRoot();
+    if (repoRoot == null) {
+      stderr.writeln(
+        'dart_changesets: no repository root found (looking for '
+        '$configFileName or a $changesetsDirName directory upward).',
+      );
+      exit(64);
+    }
+    final config = ChangesetsConfig.loadFromFile(
+      p.join(repoRoot.path, configFileName),
     );
+    final graph = await WorkspaceGraph.load(repoRoot.path, config);
+    final changesetsDir = p.join(repoRoot.path, changesetsDirName);
+
+    final code = switch (command.name) {
+      'add' => await runAdd(changesetsDir, graph, command),
+      'status' => await runStatus(changesetsDir, graph, config),
+      'version' => await runVersion(
+          repoRoot.path,
+          changesetsDir,
+          graph,
+          config,
+          checkOnly: command['check'] as bool,
+        ),
+      'doctor' => await runDoctorCommand(
+          graph,
+          config,
+          changesetsDir,
+          census: !(command['no-network'] as bool),
+        ),
+      'tags' => runTags(changesetsDir, plain: command['plain'] as bool),
+      'product-release' => runProductRelease(
+          changesetsDir,
+          config,
+          tag: command['tag'] as String?,
+        ),
+      'release-notes' => runReleaseNotes(graph, command),
+      'runner' => await runRunner(command),
+      'publish-tag' => await runPublishTag(
+          repoRoot.path,
+          graph,
+          config,
+          command,
+        ),
+      'pubspec-ahead-warnings' => await runPubspecAheadWarnings(
+          repoRoot.path,
+          changesetsDir,
+          graph,
+          config,
+        ),
+      _ => () {
+          stderr.writeln('dart_changesets: unknown command "${command.name}".');
+          return 64;
+        }(),
+    };
+    exit(code);
+  } on FormatException catch (e) {
+    stderr.writeln('dart_changesets: ${e.message}');
+    exit(64);
+  } on StateError catch (e) {
+    stderr.writeln('dart_changesets: ${e.message}');
+    exit(1);
+  } on ChangesetParseException catch (e) {
+    stderr.writeln('dart_changesets: ${e.message}');
     exit(64);
   }
-  final config = ChangesetsConfig.loadFromFile(
-    p.join(repoRoot.path, configFileName),
-  );
-  final graph = await WorkspaceGraph.load(repoRoot.path, config);
-  final changesetsDir = p.join(repoRoot.path, changesetsDirName);
+}
 
-  switch (args.command!.name) {
-    case 'add':
-      exit(await runAdd(changesetsDir, graph, args.command!));
-    case 'status':
-      exit(await runStatus(changesetsDir, graph, config));
-    case 'version':
-      exit(await runVersion(
-        repoRoot.path,
-        changesetsDir,
-        graph,
-        config,
-        checkOnly: args.command!['check'] as bool,
-      ));
-    case 'doctor':
-      exit(await runDoctorCommand(
-        graph,
-        config,
-        changesetsDir,
-        census: !(args.command!['no-network'] as bool),
-      ));
-    case 'tags':
-      exit(runTags(changesetsDir, plain: args.command!['plain'] as bool));
-    case 'product-release':
-      exit(runProductRelease(
-        changesetsDir,
-        config,
-        tag: args.command!['tag'] as String?,
-      ));
-    case 'release-notes':
-      exit(runReleaseNotes(graph, args.command!));
-    case 'runner':
-      exit(await runRunner(args.command!));
-    case 'publish-tag':
-      exit(await runPublishTag(
-        repoRoot.path,
-        graph,
-        config,
-        args.command!,
-      ));
-  }
+void _printUsage(ArgParser parser) {
+  stdout.writeln('Usage: dart_changesets [options] <command>');
+  stdout.writeln('');
+  stdout.writeln('Commands:');
+  stdout.writeln('  add            Create an intent file (interactive or --package/--bump/--message)');
+  stdout.writeln('  status         Show pending intents and planned releases');
+  stdout.writeln('  version        Apply the version train (--check to detect only)');
+  stdout.writeln('  doctor         Repository gates and pub.dev census');
+  stdout.writeln('  tags           List tags for the pending train');
+  stdout.writeln('  product-release        Product tag metadata for CI');
+  stdout.writeln('  pubspec-ahead-warnings Unreleased pubspec vs tags (advisory)');
+  stdout.writeln('  release-notes  Changelog section for GitHub releases');
+  stdout.writeln('  runner         dart or flutter for a publish tag');
+  stdout.writeln('  publish-tag    Per-tag publish preflight or execute');
+  stdout.writeln('');
+  stdout.writeln(parser.usage);
 }
 
 Directory? findRepoRoot() {
@@ -144,6 +211,30 @@ Directory? findRepoRoot() {
 }
 
 // ---------------------------------------------------------------------------
+// pubspec-ahead-warnings
+// ---------------------------------------------------------------------------
+
+Future<int> runPubspecAheadWarnings(
+  String repoRoot,
+  String changesetsDir,
+  WorkspaceGraph graph,
+  ChangesetsConfig config,
+) async {
+  final changesets = Changeset.loadPending(changesetsDir);
+  final plan = computePlan(graph: graph, changesets: changesets, config: config);
+  final warnings = await pubspecAheadWarnings(
+    repoRoot: repoRoot,
+    plan: plan,
+    config: config,
+  );
+  if (warnings.isEmpty) return 0;
+  for (final line in warnings) {
+    print(line);
+  }
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // add
 // ---------------------------------------------------------------------------
 
@@ -154,12 +245,31 @@ Future<int> runAdd(String changesetsDir, WorkspaceGraph graph, ArgResults args) 
     return 1;
   }
 
-  final package = _promptPackage(publishableNames);
+  String? package = args['package'] as String?;
+  BumpType? bump;
+  final bumpArg = args['bump'] as String?;
+  if (bumpArg != null && bumpArg.isNotEmpty) {
+    try {
+      bump = BumpType.fromString(bumpArg.toLowerCase());
+    } on ChangesetParseException catch (e) {
+      stderr.writeln('dart_changesets: ${e.message}');
+      return 64;
+    }
+  }
+  String? body = args['message'] as String?;
+
+  package ??= _promptPackage(publishableNames);
   if (package == null) return 1;
-  final bump = _promptBump();
+  if (!publishableNames.contains(package)) {
+    stderr.writeln('dart_changesets: "$package" is not a publishable package.');
+    return 64;
+  }
+  bump ??= _promptBump();
   if (bump == null) return 1;
-  stdout.writeln('Summary (one line, empty line to finish):');
-  final body = stdin.readLineSync(encoding: utf8)?.trim() ?? '';
+  if (body == null || body.isEmpty) {
+    stdout.writeln('Summary (one line, empty line to finish):');
+    body = stdin.readLineSync(encoding: utf8)?.trim() ?? '';
+  }
   if (body.isEmpty) {
     stderr.writeln('dart_changesets: empty summary — changeset discarded.');
     return 1;
@@ -284,20 +394,27 @@ Future<int> runVersion(
     }
     return 1;
   }
-  // Pubspec current version is the bump BASE — assembling on top of a
-  // pre-bumped or untagged train double-bumps. Refuse loudly instead.
+  // Refuse only inconsistent drift (pubspec behind newest release tag).
   final drift = await preReleaseDrift(
     repoRoot: repoRoot,
     plan: plan,
     config: config,
   );
   if (drift.isNotEmpty) {
-    stderr.writeln('FAIL: release drift detected — refusing to assemble a '
-        'train on top of it:');
+    stderr.writeln(
+      'FAIL: release drift detected — refusing to assemble a train:',
+    );
     for (final line in drift) {
       stderr.writeln('  - $line');
     }
     return 65;
+  }
+  for (final line in await pubspecAheadWarnings(
+    repoRoot: repoRoot,
+    plan: plan,
+    config: config,
+  )) {
+    stderr.writeln('warning: $line');
   }
   final applied = applyPlan(
     plan: plan,
@@ -312,7 +429,13 @@ Future<int> runVersion(
     print('  $path');
   }
   print('Consumed ${applied.consumedChangesets.length} changeset(s).');
-  print('Tags for this train: ${File(applied.trainsFilePath).readAsLinesSync().first}');
+  final trainJson =
+      jsonDecode(File(applied.trainsFilePath).readAsStringSync()) as List<dynamic>;
+  final tagNames = <String>[
+    for (final entry in trainJson)
+      (entry as Map<String, dynamic>)['tag'] as String,
+  ];
+  print('Tags for this train: ${tagNames.join(', ')}');
   return 0;
 }
 

@@ -397,6 +397,43 @@ void main() {
       expect(updated, contains('## 0.9.0'));
     });
 
+    test('single-package 0.3.0 train: major intent wins over minor/patch',
+        () async {
+      final root = Directory.systemTemp.createTempSync('dc_major_train_');
+      File('${root.path}/pubspec.yaml').writeAsStringSync(
+        'name: dart_changesets\n'
+        'version: 0.3.0\n'
+        'description: fixture\n'
+        'environment:\n'
+        '  sdk: ^3.14.0\n',
+      );
+      final changesets = [
+        writeChangeset(root, 'major-ship', "'dart_changesets': major\n",
+            'Ship 1.0.0.'),
+        writeChangeset(root, 'oss', "'dart_changesets': patch\n", 'OSS fixes.'),
+        writeChangeset(root, 'feat', "'dart_changesets': minor\n", 'Feature.'),
+      ];
+      try {
+        const config = ChangesetsConfig(rootPackage: true);
+        final graph = await WorkspaceGraph.load(root.path, config);
+        final plan = computePlan(
+          graph: graph,
+          changesets: changesets,
+          config: config,
+        );
+        expect(plan.releases, hasLength(1));
+        expect(plan.releases.first.package.name, 'dart_changesets');
+        expect(plan.releases.first.newVersion.toString(), '1.0.0');
+        expect(
+          config.tagFor('dart_changesets', '1.0.0'),
+          'dart_changesets-v1.0.0',
+        );
+        expect(plan.releases.first.changelogEntries.length, greaterThan(1));
+      } finally {
+        teardownRepo(root);
+      }
+    });
+
     test('changelog keeps a top-of-file comment banner above the section',
         () {
       const existing =

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import 'bump.dart';
 import 'changeset.dart';
 import 'config.dart';
@@ -29,12 +31,17 @@ final class AppliedTrain {
 /// unchanged. The pending-train artifact is committed, so machine-absolute
 /// paths must not leak into it.
 String _relativeIfUnder(String path, String root) {
+  final normPath = p.normalize(path);
+  final normRoot = p.normalize(root);
+  if (normPath == normRoot) return '.';
   final separator = Platform.pathSeparator;
   final normalizedRoot =
-      root.endsWith(separator) ? root : '$root$separator';
-  return path.startsWith(normalizedRoot)
-      ? path.substring(normalizedRoot.length)
-      : path;
+      normRoot.endsWith(separator) ? normRoot : '$normRoot$separator';
+  if (normPath.startsWith(normalizedRoot)) {
+    final rel = normPath.substring(normalizedRoot.length);
+    return rel.isEmpty ? '.' : rel;
+  }
+  return path;
 }
 
 const pendingTrainFileName = '.pending-train.json';
@@ -272,9 +279,9 @@ String prependChangelog(
     }
     final head = lines.sublist(0, insertAt).join('\n');
     final tail = lines.sublist(insertAt).join('\n');
-    return '$head\n$section\n${tail.isEmpty ? '' : '$tail\n'}';
+    return '$head\n$section\n\n${tail.isEmpty ? '' : '$tail\n'}';
   }
-  return '$section\n$existing';
+  return '$section\n\n$existing';
 }
 
 /// Renders one release section, changesets-style:
