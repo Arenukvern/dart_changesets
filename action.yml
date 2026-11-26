@@ -274,6 +274,11 @@ runs:
           if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
             echo "tag exists; skipping creation"
           else
+            # The pubspec must still carry the tag version at the merge
+            # commit. Another workflow can rewrite pubspecs on the version PR
+            # after `version` applied (mcp_flutter, 2026-11-24): the tag then
+            # publishes nothing and the next train is refused for drift.
+            dart_changesets verify-tag --tag "$tag"
             git tag "$tag" "$merge_sha"
             git push origin "$tag"
           fi

@@ -51,6 +51,7 @@ void main() {
       'release-notes',
       'runner',
       'publish-tag',
+      'verify-tag',
     ];
 
     for (final name in subcommands) {
@@ -104,6 +105,36 @@ void main() {
         ], workingDirectory: repo.path);
         expect(result.exitCode, 0, reason: result.stderr);
         expect(result.stdout.trim(), 'a-v1.0.1');
+      });
+
+      test('verify-tag accepts a pubspec that carries the tag version', () {
+        final result = runCli(const [
+          'verify-tag',
+          '--tag',
+          'a-v1.0.0',
+        ], workingDirectory: repo.path);
+        expect(result.exitCode, 0, reason: result.stderr);
+        expect(result.stdout, contains('verified a-v1.0.0'));
+      });
+
+      test('verify-tag refuses a pubspec behind the tag version', () {
+        final result = runCli(const [
+          'verify-tag',
+          '--tag',
+          'a-v1.0.1',
+        ], workingDirectory: repo.path);
+        expect(result.exitCode, 65);
+        expect(result.stderr, contains('a pubspec 1.0.0 != tag 1.0.1'));
+      });
+
+      test('verify-tag refuses an unknown tag shape', () {
+        final result = runCli(const [
+          'verify-tag',
+          '--tag',
+          'garbage',
+        ], workingDirectory: repo.path);
+        expect(result.exitCode, 64);
+        expect(result.stderr, contains('does not match tag format'));
       });
 
       test('version --check reports due PR', () {

@@ -36,6 +36,12 @@ conventions (pub_semver math, cascade test coverage, action/engine pairing).
   `--dependency-wait-minutes` and the reusable workflow's
   `dependency-wait-minutes` input (`0` = fail fast). Decision record:
   [doc/decisions/0002-dependency-wait-owned-by-publish-tag.md](../doc/decisions/0002-dependency-wait-owned-by-publish-tag.md).
+- **A tag is pushed only after `verify-tag` passes.** The release step
+  checks that the package pubspec at the merge commit still carries the
+  tag's version before creating the tag. A consumer workflow that rewrites
+  pubspecs on the version PR after `version` applied otherwise leaves a tag
+  that publishes nothing and blocks the next train with release drift
+  (mcp_flutter, 2026-11-24).
 - **The floating `v1` tag is the consumer contract.** Consumers resolve
   `uses: …@v1`; merging a workflow change alone is inert — activation is the
   hand force-move of `v1` to the released commit (CONTRIBUTING). Move it only

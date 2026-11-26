@@ -27,6 +27,9 @@ const _commandDescriptions = <String, String>{
   'runner': 'Print dart or flutter — the SDK to use when publishing a tag.',
   'publish-tag':
       'Preflight or execute pub.dev publish for one per-package release tag.',
+  'verify-tag':
+      'Check that a package pubspec still carries a release tag version '
+      'before the tag is pushed.',
 };
 
 ArgParser _subcommandParser(void Function(ArgParser p) configure) {
@@ -91,6 +94,15 @@ ArgParser buildArgParser() {
           'plain',
           negatable: false,
           help: 'Print tags space-separated (CI-friendly) instead of JSON.',
+        ),
+      ),
+    )
+    ..addCommand(
+      'verify-tag',
+      _subcommandParser(
+        (p) => p.addOption(
+          'tag',
+          help: 'Release tag to check, e.g. <package>-v<version>.',
         ),
       ),
     )
@@ -238,6 +250,7 @@ Future<void> main(List<String> arguments) async {
         census: !(command['no-network'] as bool),
       ),
       'tags' => runTags(changesetsDir, plain: command['plain'] as bool),
+      'verify-tag' => runVerifyTag(graph, config, command['tag'] as String?),
       'product-release' => runProductRelease(
         changesetsDir,
         config,
@@ -610,6 +623,27 @@ Future<int> runDoctorCommand(
 // ---------------------------------------------------------------------------
 // tags
 // ---------------------------------------------------------------------------
+
+/// Exit 65 (the release-drift exit `version` uses) when the pubspec at HEAD
+/// no longer carries the tag's version.
+int runVerifyTag(WorkspaceGraph graph, ChangesetsConfig config, String? tag) {
+  if (tag == null || tag.isEmpty) {
+    stderr.writeln('dart_changesets: verify-tag requires --tag.');
+    return publishExitUsage;
+  }
+  final drift = trainTagDrift(graph: graph, config: config, tag: tag);
+  if (drift != null) {
+    final usage = config.parseTag(tag.trim()) == null;
+    stderr.writeln(
+      usage
+          ? 'dart_changesets: $drift'
+          : 'FAIL: refusing to push tag "$tag" — $drift',
+    );
+    return usage ? publishExitUsage : publishExitBootstrapNeeded;
+  }
+  print('verified $tag');
+  return 0;
+}
 
 int runTags(String changesetsDir, {required bool plain}) {
   final file = File(p.join(changesetsDir, pendingTrainFileName));
