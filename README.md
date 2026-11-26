@@ -284,6 +284,7 @@ dart_changesets version [--check]  # apply (or detect) the version train
 dart_changesets doctor [--no-network]  # gates + pub.dev census
 dart_changesets tags               # tags for the pending train (JSON)
 dart_changesets runner --tag <pkg>-v<semver>   # dart | flutter
+dart_changesets verify-tag --tag <pkg>-v<semver>   # pubspec still carries the tag version (exit 65 on drift)
 dart_changesets publish-tag --tag <pkg>-v<semver> [--execute] [--skip-existing] [--dependency-wait-minutes 15] [--skip-dependency-gate]
 ```
 

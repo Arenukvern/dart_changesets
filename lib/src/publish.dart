@@ -69,8 +69,12 @@ Future<int> publishTag(
     );
     return publishExitUsage;
   }
-  final changelog = File('${pkg.directory}${Platform.pathSeparator}CHANGELOG.md');
-  final changelogText = changelog.existsSync() ? changelog.readAsStringSync() : '';
+  final changelog = File(
+    '${pkg.directory}${Platform.pathSeparator}CHANGELOG.md',
+  );
+  final changelogText = changelog.existsSync()
+      ? changelog.readAsStringSync()
+      : '';
   // The heading must START with the exact version — an exact `## 1.2.3`
   // and an annotated `## 1.2.3 (2026-11-22)` both count, but `## 1.2.31`
   // does not (the `(?![\d.])` boundary). Version-suffixed headings are the
@@ -81,10 +85,10 @@ Future<int> publishTag(
     multiLine: true,
   );
   if (!versionHeading.hasMatch(changelogText)) {
-    final headings = RegExp(r'^##[ \t]+.*$', multiLine: true)
-        .allMatches(changelogText)
-        .map((match) => match.group(0)!.trim())
-        .toList();
+    final headings = RegExp(
+      r'^##[ \t]+.*$',
+      multiLine: true,
+    ).allMatches(changelogText).map((match) => match.group(0)!.trim()).toList();
     stderr.writeln(
       'FAIL: $packageName/CHANGELOG.md has no entry for $versionRaw — '
       'expected a "##" heading that starts with "$versionRaw" '
@@ -140,7 +144,9 @@ pub.dev cannot automate a package's first release:
   final unsatisfied = <String, VersionConstraint>{};
   for (final entry in pkg.dependencies.entries) {
     final dep = graph.packages[entry.key];
-    if (dep == null || !entry.value.isHosted || entry.value.constraint == null) {
+    if (dep == null ||
+        !entry.value.isHosted ||
+        entry.value.constraint == null) {
       continue;
     }
     unsatisfied[entry.key] = VersionConstraint.parse(entry.value.constraint!);
@@ -183,8 +189,7 @@ pub.dev cannot automate a package's first release:
           }
         }
         if (pending.isEmpty) break;
-        final elapsed =
-            dependencyWait - deadline.difference(DateTime.now());
+        final elapsed = dependencyWait - deadline.difference(DateTime.now());
         print(
           'waiting for pub.dev: ${pending.keys.join(', ')} '
           '(${elapsed.inSeconds}s/${dependencyWait.inSeconds}s budget)',
@@ -208,11 +213,11 @@ FAIL: pub.dev did not expose versions of ${pending.keys.toList()}
 
   // -- Strict dry-run -----------------------------------------------------
   final runner = publishRunner(graph, pkg);
-  final dryRun = await Process.run(
-    runner,
-    const <String>['pub', 'publish', '--dry-run'],
-    workingDirectory: pkg.directory,
-  );
+  final dryRun = await Process.run(runner, const <String>[
+    'pub',
+    'publish',
+    '--dry-run',
+  ], workingDirectory: pkg.directory);
   if (dryRun.exitCode != 0) {
     stderr.writeln(
       'FAIL: strict publish dry-run for $packageName failed '
@@ -227,11 +232,11 @@ FAIL: pub.dev did not expose versions of ${pending.keys.toList()}
   }
 
   // -- Publish ------------------------------------------------------------
-  final publish = await Process.run(
-    runner,
-    const <String>['pub', 'publish', '--force'],
-    workingDirectory: pkg.directory,
-  );
+  final publish = await Process.run(runner, const <String>[
+    'pub',
+    'publish',
+    '--force',
+  ], workingDirectory: pkg.directory);
   if (publish.exitCode != 0) {
     stderr.writeln(
       'FAIL: publishing $packageName $versionRaw failed '
@@ -286,10 +291,40 @@ Future<bool> _hasVersion(
   });
 }
 
-Future<List<String>?> _visibleVersions(PubDevClient client, String package) async {
+Future<List<String>?> _visibleVersions(
+  PubDevClient client,
+  String package,
+) async {
   try {
     return await client.versions(package);
   } on Exception {
     return null;
   }
+}
+
+/// Pre-tag check for the action's release step: a tag must only be created
+/// at a commit whose pubspec carries the tag's version. Checks nothing else
+/// (no network, no changelog) — `publish-tag` remains the full gate.
+///
+/// Returns null when the tag is safe to push, else a one-line reason.
+String? trainTagDrift({
+  required WorkspaceGraph graph,
+  required ChangesetsConfig config,
+  required String tag,
+}) {
+  final parsed = config.parseTag(tag.trim());
+  if (parsed == null) {
+    return 'tag "$tag" does not match tag format "${config.tagFormat}".';
+  }
+  final (packageName, versionRaw) = parsed;
+  final pkg = graph.packages[packageName];
+  if (pkg == null) {
+    return '"$packageName" is not a workspace package.';
+  }
+  if (pkg.version != Version.parse(versionRaw)) {
+    return '$packageName pubspec ${pkg.version} != tag $versionRaw. '
+        'A workflow rewrote the pubspec after `version` applied — restore it '
+        'to $versionRaw on main before pushing the tag.';
+  }
+  return null;
 }
