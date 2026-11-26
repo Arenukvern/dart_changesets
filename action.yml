@@ -182,6 +182,26 @@ runs:
             release_match=true
           fi
         fi
+        # A dispatched run re-evaluates the same merge commit. If every tag
+        # of the pending train is already on the remote, the release leg has
+        # run — release mode here would only re-publish and never assemble
+        # the intents that landed since (dart_changesets, 2026-11-26).
+        if [ "$release_match" = "true" ] &&
+          [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+          all_tagged=true
+          seen=0
+          for tag in $(dart_changesets tags --plain); do
+            seen=$((seen + 1))
+            git ls-remote --exit-code origin "refs/tags/$tag" >/dev/null 2>&1 ||
+              all_tagged=false
+          done
+          # No tags listed (engine failure) is not proof of a released train.
+          [ "$seen" -gt 0 ] || all_tagged=false
+          if [ "$all_tagged" = "true" ]; then
+            echo "dispatch: pending train is already tagged; assembling instead of re-releasing"
+            release_match=false
+          fi
+        fi
         # Release mode wins over assemble: new intent files can land on main
         # while a version PR is open — merging that PR must still push tags.
         if [ "$release_match" = "true" ]; then
