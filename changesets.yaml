@@ -4,6 +4,11 @@ packages_dir: pkgs
 root_package: true
 dependent_bump: patch
 tag_format: '{package}-v{version}'
+# The released package is also the product: each train gets a `v<version>`
+# tag and a GitHub release (what the Marketplace listing shows).
+product_tag:
+  package: dart_changesets
+  format: 'v{version}'
 version_files:
   dart_changesets:
     - path: lib/src/version.dart
