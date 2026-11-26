@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4
+
+### Patch Changes
+
+- A `workflow_dispatch` run no longer re-enters release mode when every tag of the pending train already exists on the remote; it assembles the intents that landed since. Restores the engine's own `product_tag` so each train gets a `v<version>` tag and a GitHub release again.
+- Release step runs `verify-tag` before creating each package tag: refuse (exit 65) when the pubspec at the merge commit no longer carries the tag version, instead of pushing a tag that publishes nothing and blocks the next train with release drift.
+
 ## 1.0.3
 
 ### Patch Changes
@@ -110,6 +117,7 @@
   publish train, composite GitHub Action, and reusable publish workflow.
 - Extracted from `pkgs/dart_changesets` in `xsoulspace/dart_flutter_packages`
   (ADR 0073 there).
+
 
 
 
